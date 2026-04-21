@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Live Stream</title>
+<style>
+body { background:#020617; color:#38bdf8; font-family:monospace; }
+#log { height:90vh; overflow:auto; padding:10px; }
+</style>
+</head>
+<body>
+<h2>💀 Live Agent Stream</h2>
+<div id="log"></div>
+<script>
+async function fetchLogs(){
+ let res = await fetch('/logs');
+ let text = await res.text();
+ document.getElementById('log').innerText = text;
+}
+setInterval(fetchLogs,2000);
+</script>
+</body>
+</html>

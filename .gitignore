@@ -1,0 +1,64 @@
+# Virtual Environment
+venv/
+env/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+*.txt
+_tail.txt
+_test.txt
+ssh_out.txt
+
+# Database
+*.db
+agent_state.db
+
+# Cache & Temp
+.claude/
+*.cache
+*.tmp
+.cache/
+
+# Screenshots & Media
+screenshots/
+dashboard.png
+
+# Build & Artifacts
+build/
+dist/
+*.egg-info/
+
+# Node modules (for Chrome extension)
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+
+# Backup files
+*.bak
+server.py.bak
+
+# Directories to ignore
+smoke_folder/

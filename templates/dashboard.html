@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EN MOSTAFA AI AGENT — Control Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #07090f;
+    --surface:  #0d1117;
+    --card:     #111827;
+    --border:   #1f2937;
+    --border2:  #374151;
+    --accent:   #00e5ff;
+    --accent2:  #7c3aed;
+    --green:    #10b981;
+    --red:      #ef4444;
+    --yellow:   #f59e0b;
+    --text:     #e2e8f0;
+    --muted:    #6b7280;
+    --mono:     'Space Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── SCANLINE OVERLAY ─── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,229,255,.015) 2px, rgba(0,229,255,.015) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* ─── TOPBAR ─── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px; height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar-brand {
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 13px; letter-spacing: .08em;
+    color: var(--accent);
+  }
+  .topbar-brand .skull { font-size: 20px; }
+  .topbar-right { display: flex; align-items: center; gap: 20px; }
+  .clock { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  /* ─── STATUS PILL ─── */
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 13px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    border: 1px solid transparent;
+  }
+  .pill-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .pill.idle   { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.3); color: var(--yellow); }
+  .pill.idle   .pill-dot { background: var(--yellow); }
+  .pill.running{ background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.3); color: var(--green); }
+  .pill.running .pill-dot { background: var(--green); animation: blink 1s infinite; }
+  .pill.stopped{ background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.3); color: var(--red); }
+  .pill.stopped .pill-dot { background: var(--red); }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ─── LAYOUT ─── */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 300px;
+    grid-template-rows: auto 1fr;
+    gap: 1px;
+    background: var(--border);
+    height: calc(100vh - 56px);
+  }
+
+  .panel {
+    background: var(--surface);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .panel-header .ph-icon { color: var(--accent); font-size: 12px; }
+  .panel-body { flex: 1; overflow-y: auto; padding: 14px; }
+  .panel-body::-webkit-scrollbar { width: 4px; }
+  .panel-body::-webkit-scrollbar-track { background: transparent; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ─── LEFT SIDEBAR ─── */
+  .sidebar { grid-row: 1 / 3; }
+
+  /* ─── METRICS ─── */
+  .metric-block { margin-bottom: 6px; }
+  .metric-label {
+    font-size: 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .08em; margin-bottom: 4px;
+  }
+  .metric-value {
+    font-family: var(--mono); font-size: 28px; font-weight: 700;
+    color: var(--text); line-height: 1;
+  }
+  .metric-value.green { color: var(--green); }
+  .metric-value.red   { color: var(--red); }
+  .metric-value.cyan  { color: var(--accent); }
+
+  .metric-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 0; border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-row .key { color: var(--muted); }
+  .metric-row .val { font-family: var(--mono); font-size: 11px; color: var(--text); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+  .metric-row .val.green { color: var(--green); }
+  .metric-row .val.red   { color: var(--red); }
+
+  /* ─── SECTION TITLE ─── */
+  .section-title {
+    font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--border2); margin: 16px 0 8px;
+  }
+
+  /* ─── BUTTONS ─── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 16px; border-radius: 6px; border: none; cursor: pointer;
+    font-family: var(--sans); font-size: 12px; font-weight: 600;
+    transition: all .15s; white-space: nowrap;
+  }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover:not(:disabled) { background: #33ecff; box-shadow: 0 0 16px rgba(0,229,255,.35); }
+  .btn-danger  { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+  .btn-danger:hover:not(:disabled)  { background: rgba(239,68,68,.25); }
+  .btn-success { background: rgba(16,185,129,.15); color: var(--green); border: 1px solid rgba(16,185,129,.3); }
+  .btn-success:hover:not(:disabled) { background: rgba(16,185,129,.25); }
+  .btn-ghost   { background: var(--card); color: var(--text); border: 1px solid var(--border2); }
+  .btn-ghost:hover:not(:disabled)   { border-color: var(--accent); color: var(--accent); }
+  .btn-icon    { padding: 8px; width: 34px; height: 34px; }
+  .btn-full    { width: 100%; }
+
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-row .btn { flex: 1; min-width: 80px; }
+
+  /* ─── QUICK ACTIONS ─── */
+  .quick-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px;
+  }
+  .quick-btn {
+    padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--card); color: var(--muted);
+    font-size: 11px; cursor: pointer; text-align: center; transition: all .15s;
+    font-family: var(--sans);
+  }
+  .quick-btn:hover { border-color: var(--accent2); color: var(--text); background: rgba(124,58,237,.1); }
+
+  /* ─── MAIN CONTENT ─── */
+  .main-top  { border-bottom: 1px solid var(--border); }
+  .main-bottom { }
+
+  /* ─── BROWSER SCREEN ─── */
+  .screen-wrap {
+    position: relative;
+    background: #000;
+    aspect-ratio: 16/9;
+    border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .screen-wrap img {
+    width: 100%; height: 100%; object-fit: contain; display: block;
+  }
+  .screen-badge {
+    position: absolute; top: 10px; left: 10px;
+    font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 4px;
+    letter-spacing: .06em;
+  }
+  .screen-badge.live  { background: var(--red); color: #fff; }
+  .screen-badge.idle  { background: rgba(0,0,0,.6); color: var(--muted); border: 1px solid var(--border); }
+
+  .url-bar {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0 12px; height: 36px;
+    font-size: 12px; color: var(--muted); overflow: hidden;
+    margin-bottom: 10px; flex: 1;
+  }
+  .url-bar .url-icon { color: var(--accent); flex-shrink: 0; }
+  .url-bar .url-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+
+  /* ─── COMMAND INPUT ─── */
+  .cmd-row { display: flex; gap: 8px; align-items: stretch; }
+  .cmd-input {
+    flex: 1; background: var(--card); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 12px;
+    padding: 9px 14px; border-radius: 6px; outline: none;
+    transition: border-color .15s;
+  }
+  .cmd-input:focus { border-color: var(--accent); }
+  .cmd-input::placeholder { color: var(--muted); }
+
+  /* ─── LOGS ─── */
+  .log-wrap {
+    flex: 1; overflow-y: auto; padding: 10px;
+    font-family: var(--mono); font-size: 11px; line-height: 1.7;
+    background: #050810;
+    border-radius: 6px; border: 1px solid var(--border);
+  }
+  .log-wrap::-webkit-scrollbar { width: 4px; }
+  .log-wrap::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  .log-line { display: flex; gap: 10px; padding: 2px 0; }
+  .log-line:hover { background: rgba(255,255,255,.02); }
+  .log-ts { color: var(--border2); flex-shrink: 0; }
+  .log-msg.info    { color: var(--muted); }
+  .log-msg.success { color: var(--green); }
+  .log-msg.error   { color: var(--red); }
+  .log-msg.warn    { color: var(--yellow); }
+
+  /* ─── TASK INPUT ─── */
+  .task-input {
+    width: 100%; background: var(--card); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--sans); font-size: 13px;
+    padding: 10px 14px; border-radius: 6px; outline: none;
+    resize: none; height: 72px; transition: border-color .15s;
+  }
+  .task-input:focus { border-color: var(--accent); }
+  .task-input::placeholder { color: var(--muted); }
+
+  /* ─── PROGRESS BAR ─── */
+  .progress-wrap {
+    height: 3px; background: var(--border);
+    border-radius: 2px; overflow: hidden; margin: 8px 0;
+  }
+  .progress-bar {
+    height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px; transition: width .5s ease;
+  }
+
+  /* ─── DIVIDER ─── */
+  .divider { height: 1px; background: var(--border); margin: 10px 0; }
+
+  /* ─── MEMORY PILL ─── */
+  .mem-item {
+    padding: 8px 10px; border-radius: 6px; background: var(--card);
+    border: 1px solid var(--border); margin-bottom: 6px; font-size: 11px;
+  }
+  .mem-key { color: var(--accent); font-family: var(--mono); margin-bottom: 2px; }
+  .mem-val { color: var(--muted); word-break: break-all; }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 220px 1fr; }
+    .right-panel { display: none; }
+  }
+  @media (max-width: 720px) {
+    .layout { grid-template-columns: 1fr; grid-template-rows: auto; }
+    .sidebar { grid-row: auto; }
+  }
+
+  /* ─── ANIMATIONS ─── */
+  @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+  .panel { animation: fadeIn .3s ease; }
+
+  .badge-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--accent2); color: #fff;
+    border-radius: 999px; min-width: 18px; height: 18px;
+    font-size: 10px; font-weight: 700; padding: 0 5px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── TOPBAR ─── -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="skull">💀</span>
+    <span>EN MOSTAFA / AI&nbsp;AGENT</span>
+  </div>
+  <div class="topbar-right">
+    <span class="clock" id="clock">--:--:--</span>
+    <div id="global-status" class="pill idle">
+      <span class="pill-dot"></span>
+      <span id="status-label">Idle</span>
+    </div>
+  </div>
+</header>
+
+<!-- ─── MAIN LAYOUT ─── -->
+<div class="layout">
+
+  <!-- ════════ LEFT SIDEBAR ════════ -->
+  <aside class="panel sidebar">
+    <div class="panel-header">
+      <span>📊 Metrics</span>
+    </div>
+    <div class="panel-body">
+
+      <!-- Big numbers -->
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:14px;">
+        <div class="metric-block">
+          <div class="metric-label">Tasks</div>
+          <div class="metric-value cyan" id="m-tasks">0</div>
+        </div>
+        <div class="metric-block">
+          <div class="metric-label">OK</div>
+          <div class="metric-value green" id="m-success">0</div>
+        </div>
+        <div class="metric-block">
+          <div class="metric-label">Fail</div>
+          <div class="metric-value red" id="m-fail">0</div>
+        </div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+      </div>
+      <div style="font-size:10px; color:var(--muted); margin-bottom:12px;">
+        Progress <span id="progress-pct">0</span>%
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Status rows -->
+      <div class="metric-row">
+        <span class="key">Agent</span>
+        <span class="val" id="r-status">Stopped</span>
+      </div>
+      <div class="metric-row">
+        <span class="key">Last Action</span>
+        <span class="val" id="r-action">—</span>
+      </div>
+      <div class="metric-row">
+        <span class="key">Cmd Status</span>
+        <span class="val" id="r-cmd">—</span>
+      </div>
+      <div class="metric-row">
+        <span class="key">Updated</span>
+        <span class="val" id="r-updated">—</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Controls -->
+      <div class="section-title">Agent Control</div>
+      <div class="btn-row" style="margin-bottom:8px;">
+        <button class="btn btn-success" onclick="startAgent()">▶ Start</button>
+        <button class="btn btn-danger"  onclick="stopAgent()">■ Stop</button>
+      </div>
+      <button class="btn btn-ghost btn-full" onclick="refreshScreenshot()" style="margin-bottom:8px;">
+        🔄 Refresh Screen
+      </button>
+
+      <div class="section-title">Quick Actions</div>
+      <div class="quick-grid">
+        <button class="quick-btn" onclick="quickCmd('reload')">↺ Reload</button>
+        <button class="quick-btn" onclick="quickCmd('back')">← Back</button>
+        <button class="quick-btn" onclick="quickCmd('scroll down')">↓ Scroll</button>
+        <button class="quick-btn" onclick="quickCmd('scroll up')">↑ Scroll Up</button>
+        <button class="quick-btn" onclick="quickCmd('لقطة شاشة')">📸 Screenshot</button>
+        <button class="quick-btn" onclick="quickCmd('wait_load')">⏳ Wait Load</button>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ════════ MAIN TOP — BROWSER VIEW ════════ -->
+  <section class="panel main-top" style="padding:14px; display:flex; flex-direction:column; gap:10px;">
+
+    <div class="panel-header" style="margin:-14px -14px 0; padding:12px 16px;">
+      <span>🖥️ Live Browser</span>
+      <span class="badge-count" id="live-badge">LIVE</span>
+    </div>
+    <div style="height:12px;"></div>
+
+    <!-- URL bar -->
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div class="url-bar">
+        <span class="url-icon">🌐</span>
+        <span class="url-text" id="url-display">—</span>
+      </div>
+      <button class="btn btn-ghost btn-icon" title="Go" onclick="navigateTo()">→</button>
+    </div>
+
+    <!-- Screen -->
+    <div class="screen-wrap" style="flex:1;">
+      <span id="screen-badge" class="screen-badge idle">IDLE</span>
+      <img id="screen-img" src="" alt="Browser view" onerror="this.style.display='none'">
+      <div id="screen-placeholder" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);font-size:13px;gap:8px;">
+        <span style="font-size:36px;">🖥️</span>
+        <span>No screen capture yet</span>
+        <span style="font-size:11px;">Start agent or press Refresh</span>
+      </div>
+    </div>
+
+    <!-- Command row -->
+    <div class="cmd-row">
+      <input id="cmd-input" class="cmd-input" placeholder="Navigate to URL or type a command (Enter to send)…"
+        onkeydown="if(event.key==='Enter') sendCommand()">
+      <button class="btn btn-primary" onclick="sendCommand()">Send</button>
+    </div>
+  </section>
+
+  <!-- ════════ RIGHT PANEL ════════ -->
+  <aside class="panel right-panel" style="border-left:1px solid var(--border);">
+    <div class="panel-header">
+      <span>📄 Page Info</span>
+    </div>
+    <div class="panel-body" style="padding-bottom:0;">
+      <div class="metric-row">
+        <span class="key">Title</span>
+        <span class="val" id="r-title">—</span>
+      </div>
+      <div class="metric-row">
+        <span class="key">URL</span>
+        <span class="val" id="r-url" style="font-size:10px;">—</span>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-title">Run Task</div>
+      <textarea id="task-input" class="task-input" placeholder="Describe a task for the agent…"></textarea>
+      <div style="margin-top:8px;">
+        <button class="btn btn-primary btn-full" onclick="runTask()">⚡ Execute Task</button>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-title">Memory</div>
+      <div id="mem-panel" style="font-size:11px; color:var(--muted);">Loading…</div>
+
+    </div>
+  </aside>
+
+  <!-- ════════ MAIN BOTTOM — LOGS ════════ -->
+  <section class="panel main-bottom" style="padding:14px; display:flex; flex-direction:column; gap:8px;">
+    <div class="panel-header" style="margin:-14px -14px 0; padding:12px 16px;">
+      <span>📋 Live Logs</span>
+      <button class="btn btn-ghost" style="padding:3px 10px; font-size:10px;" onclick="clearLogs()">Clear</button>
+    </div>
+    <div style="height:4px;"></div>
+    <div class="log-wrap" id="log-wrap"></div>
+  </section>
+
+</div><!-- /layout -->
+
+<script>
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let taskCount = 0, successCount = 0, failCount = 0;
+let lastScreenshot = '';
+let agentRunning = false;
+let autoRefreshTimer = null;
+
+// ═══════════════════════════════════════════════
+//  CLOCK
+// ═══════════════════════════════════════════════
+function tickClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-US', { hour12: false });
+}
+setInterval(tickClock, 1000); tickClock();
+
+// ═══════════════════════════════════════════════
+//  LOG HELPERS
+// ═══════════════════════════════════════════════
+function addLog(msg, level = 'info') {
+  const wrap = document.getElementById('log-wrap');
+  const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-ts">[${ts}]</span><span class="log-msg ${level}">${msg}</span>`;
+  wrap.appendChild(line);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function renderLogs(logs) {
+  const wrap = document.getElementById('log-wrap');
+  wrap.innerHTML = '';
+  (logs || []).forEach(e => {
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `<span class="log-ts">[${e.time}]</span><span class="log-msg ${e.level||'info'}">${e.message}</span>`;
+    wrap.appendChild(line);
+  });
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function clearLogs() {
+  document.getElementById('log-wrap').innerHTML = '';
+  addLog('Logs cleared', 'info');
+}
+
+// ═══════════════════════════════════════════════
+//  STATUS UPDATE
+// ═══════════════════════════════════════════════
+function setStatus(status) {
+  const pill = document.getElementById('global-status');
+  const label = document.getElementById('status-label');
+  const badge = document.getElementById('screen-badge');
+  pill.className = 'pill ' + status;
+  label.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+  if (status === 'running') {
+    badge.className = 'screen-badge live'; badge.textContent = 'LIVE';
+    startAutoRefresh();
+  } else {
+    badge.className = 'screen-badge idle'; badge.textContent = status.toUpperCase();
+    stopAutoRefresh();
+  }
+}
+
+function updateDashboard(data) {
+  if (!data) return;
+
+  // Status
+  setStatus(data.status || 'stopped');
+  document.getElementById('r-status').textContent   = (data.status || 'stopped');
+  document.getElementById('r-status').className     = 'val ' + (data.status === 'running' ? 'green' : data.status === 'stopped' ? 'red' : '');
+  document.getElementById('r-action').textContent   = data.last_action || '—';
+  document.getElementById('r-cmd').textContent      = data.command_status || '—';
+  document.getElementById('r-updated').textContent  = data.last_update ? data.last_update.split('T')[1]?.slice(0,8) : '—';
+  document.getElementById('r-title').textContent    = data.title || '—';
+  document.getElementById('r-url').textContent      = data.url || '—';
+  document.getElementById('url-display').textContent= data.url || '—';
+
+  // Progress
+  const pct = data.progress || 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-pct').textContent = pct;
+
+  // Screenshot
+  if (data.screenshot && data.screenshot !== lastScreenshot) {
+    lastScreenshot = data.screenshot;
+    const img = document.getElementById('screen-img');
+    img.src = data.screenshot;
+    img.style.display = 'block';
+    document.getElementById('screen-placeholder').style.display = 'none';
+  }
+
+  // Logs
+  if (Array.isArray(data.logs) && data.logs.length) renderLogs(data.logs);
+}
+
+// ═══════════════════════════════════════════════
+//  AGENT CONTROLS
+// ═══════════════════════════════════════════════
+async function startAgent() {
+  try {
+    addLog('Starting agent…', 'info');
+    const r = await fetch('/agent/running', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ running: true })
+    });
+    const d = await r.json();
+    agentRunning = d.running;
+    addLog(d.running ? 'Agent started ✓' : 'Start failed', d.running ? 'success' : 'error');
+    setStatus(d.running ? 'running' : 'stopped');
+  } catch(e) { addLog('Error: ' + e.message, 'error'); }
+}
+
+async function stopAgent() {
+  try {
+    addLog('Stopping agent…', 'info');
+    const r = await fetch('/agent/running', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ running: false })
+    });
+    const d = await r.json();
+    agentRunning = d.running;
+    addLog('Agent stopped', 'warn');
+    setStatus('stopped');
+  } catch(e) { addLog('Error: ' + e.message, 'error'); }
+}
+
+async function refreshScreenshot() {
+  try {
+    const r = await fetch('/agent/screenshot', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    if (!r.ok) { addLog('Screenshot failed (agent not running?)', 'warn'); return; }
+    const d = await r.json();
+    if (d.success && d.url) {
+      const img = document.getElementById('screen-img');
+      img.src = d.url + '?t=' + Date.now();
+      img.style.display = 'block';
+      document.getElementById('screen-placeholder').style.display = 'none';
+      lastScreenshot = d.url;
+      addLog('Screen refreshed ✓', 'success');
+    }
+  } catch(e) { addLog('Refresh error: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════
+//  COMMANDS
+// ═══════════════════════════════════════════════
+async function sendCommand() {
+  const input = document.getElementById('cmd-input');
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  addLog('CMD → ' + cmd, 'info');
+  try {
+    const r = await fetch('/agent/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: cmd })
+    });
+    const d = await r.json();
+    if (d.success) {
+      input.value = '';
+      addLog('Done: ' + d.action, 'success');
+      if (d.url) document.getElementById('url-display').textContent = d.url;
+      if (d.screenshot) {
+        const img = document.getElementById('screen-img');
+        img.src = d.screenshot;
+        img.style.display = 'block';
+        document.getElementById('screen-placeholder').style.display = 'none';
+      }
+    } else {
+      addLog('Failed: ' + (d.error || 'unknown'), 'error');
+    }
+  } catch(e) { addLog('CMD error: ' + e.message, 'error'); }
+}
+
+function quickCmd(cmd) {
+  document.getElementById('cmd-input').value = cmd;
+  sendCommand();
+}
+
+function navigateTo() {
+  const url = document.getElementById('url-display').textContent;
+  if (url && url !== '—') quickCmd(url);
+}
+
+// ═══════════════════════════════════════════════
+//  RUN TASK (original /run endpoint)
+// ═══════════════════════════════════════════════
+async function runTask() {
+  const taskEl = document.getElementById('task-input');
+  const task = taskEl.value.trim();
+  if (!task) return;
+  taskCount++;
+  document.getElementById('m-tasks').textContent = taskCount;
+  addLog('Task → ' + task, 'info');
+  try {
+    const r = await fetch('/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task })
+    });
+    const d = await r.json();
+    successCount++;
+    document.getElementById('m-success').textContent = successCount;
+    taskEl.value = '';
+    addLog('Task complete ✓', 'success');
+    addLog(JSON.stringify(d).slice(0, 200), 'info');
+  } catch(e) {
+    failCount++;
+    document.getElementById('m-fail').textContent = failCount;
+    addLog('Task error: ' + e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  AUTO REFRESH
+// ═══════════════════════════════════════════════
+function startAutoRefresh() {
+  if (autoRefreshTimer) return;
+  autoRefreshTimer = setInterval(refreshScreenshot, 3000);
+}
+function stopAutoRefresh() {
+  if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+}
+
+// ═══════════════════════════════════════════════
+//  POLLING — fallback when no Socket.IO
+// ═══════════════════════════════════════════════
+async function pollStatus() {
+  try {
+    const r = await fetch('/agent/status');
+    if (!r.ok) return;
+    const d = await r.json();
+    // map agent_status fields to dashboard shape
+    updateDashboard({
+      status: d.running ? 'running' : 'stopped',
+      url: d.current_url || '',
+      last_action: d.last_action || '',
+      last_update: d.started_at || '',
+      screenshot: d.last_screenshot || '',
+      progress: 0
+    });
+  } catch(_) {}
+}
+
+async function pollLogs() {
+  try {
+    const r = await fetch('/logs');
+    if (!r.ok) return;
+    const text = await r.text();
+    if (!text.trim()) return;
+    const wrap = document.getElementById('log-wrap');
+    // Only update if server logs differ
+    const lines = text.trim().split('\n').slice(-50);
+    // Render as plain log entries
+    wrap.innerHTML = '';
+    lines.forEach(l => {
+      const div = document.createElement('div');
+      div.className = 'log-line';
+      div.innerHTML = `<span class="log-ts">SYS</span><span class="log-msg info">${l}</span>`;
+      wrap.appendChild(div);
+    });
+    wrap.scrollTop = wrap.scrollHeight;
+  } catch(_) {}
+}
+
+// Memory poll
+async function pollMemory() {
+  try {
+    const r = await fetch('/agent/status');
+    if (!r.ok) return;
+    // Basic — show status keys
+    const d = await r.json();
+    const panel = document.getElementById('mem-panel');
+    const keys = Object.entries(d).filter(([k,v]) => v != null && v !== false);
+    if (!keys.length) { panel.textContent = 'No memory data'; return; }
+    panel.innerHTML = keys.map(([k,v]) => `
+      <div class="mem-item">
+        <div class="mem-key">${k}</div>
+        <div class="mem-val">${typeof v === 'object' ? JSON.stringify(v).slice(0,80) : String(v).slice(0,80)}</div>
+      </div>`).join('');
+  } catch(_) {}
+}
+
+// ═══════════════════════════════════════════════
+//  SOCKET.IO (optional — graceful fallback)
+// ═══════════════════════════════════════════════
+function trySocketIO() {
+  if (typeof io === 'undefined') {
+    addLog('Socket.IO not available — polling mode', 'warn');
+    setInterval(pollStatus, 2000);
+    setInterval(pollLogs, 2000);
+    setInterval(pollMemory, 5000);
+    return;
+  }
+  const socket = io('/dashboard', { transports: ['websocket','polling'], reconnection: true });
+  socket.on('connect',    () => { addLog('WebSocket connected ✓', 'success'); });
+  socket.on('disconnect', () => { addLog('WebSocket disconnected', 'warn'); });
+  socket.on('dashboard_update', updateDashboard);
+  socket.on('connect_error', () => {
+    addLog('WS error — switching to polling', 'warn');
+    setInterval(pollStatus, 2000);
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+addLog('Dashboard initialised ✓', 'success');
+pollStatus();
+pollMemory();
+setInterval(pollLogs, 2000);
+setInterval(pollMemory, 8000);
+
+// Load Socket.IO dynamically
+const sioScript = document.createElement('script');
+sioScript.src = 'https://cdn.socket.io/4.5.4/socket.io.min.js';
+sioScript.onload  = trySocketIO;
+sioScript.onerror = () => {
+  addLog('Socket.IO load failed — polling mode', 'warn');
+  setInterval(pollStatus, 2000);
+};
+document.head.appendChild(sioScript);
+</script>
+</body>
+</html>

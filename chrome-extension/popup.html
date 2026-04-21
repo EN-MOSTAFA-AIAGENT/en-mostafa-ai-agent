@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI WordPress Agent</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{width:340px;min-height:440px;font-family:-apple-system,'Segoe UI',sans-serif;background:#07090f;color:#e2e8f0}
+
+.topbar{background:#1d2327;padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #2c3338}
+.topbar .logo{font-size:18px}
+.topbar h1{font-size:12px;font-weight:700;color:#00e5ff;flex:1}
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.status-dot.ok{background:#10b981}
+.status-dot.err{background:#ef4444}
+#agent-status{font-size:10px;color:#6b7280;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.badge{padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700}
+.badge.mock{background:#f59e0b22;color:#f59e0b}
+.badge.claude{background:#7c3aed22;color:#a78bfa}
+.badge.openai{background:#10b98122;color:#10b981}
+.badge.ollama{background:#2271b122;color:#72aee6}
+
+.tabs{display:flex;border-bottom:1px solid #1f2937}
+.tab{flex:1;padding:7px 4px;text-align:center;cursor:pointer;font-size:10px;color:#6b7280;border-bottom:2px solid transparent;transition:.15s}
+.tab.active{color:#00e5ff;border-bottom-color:#00e5ff}
+
+.panel{display:none;padding:10px 12px}
+.panel.active{display:block}
+
+.field{margin-bottom:8px}
+.field label{display:block;font-size:10px;color:#6b7280;margin-bottom:3px}
+.field input,.field textarea,.field select{width:100%;background:#111827;border:1px solid #1f2937;color:#e2e8f0;padding:6px 9px;border-radius:4px;font-size:11px;font-family:inherit}
+.field input:focus,.field textarea:focus{outline:none;border-color:#00e5ff}
+.field textarea{resize:vertical;min-height:56px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:6px 12px;border-radius:4px;border:none;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s;width:100%;margin-bottom:5px}
+.btn-primary{background:#2271b1;color:#fff}
+.btn-primary:hover{background:#135e96}
+.btn-green{background:#10b981;color:#fff}
+.btn-green:hover{background:#059669}
+.btn-ghost{background:#1f2937;color:#e2e8f0}
+.btn-ghost:hover{background:#374151}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+
+.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}
+.quick-btn{padding:5px;font-size:10px;background:#111827;border:1px solid #1f2937;color:#ccc;border-radius:3px;cursor:pointer;text-align:center}
+.quick-btn:hover{border-color:#00e5ff;color:#00e5ff}
+
+.log{background:#050810;border:1px solid #1f2937;border-radius:4px;padding:7px;max-height:100px;overflow-y:auto;font-size:10px;margin-top:6px}
+.log-line{padding:1px 0}
+.log-line.ok{color:#10b981}
+.log-line.err{color:#ef4444}
+.log-line.info{color:#72aee6}
+.log-line.warn{color:#f59e0b}
+
+.info-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1f2937;font-size:11px}
+.info-row .key{color:#6b7280}
+.info-row .val{color:#e2e8f0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.site-row{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:3px;cursor:pointer;font-size:11px;margin-bottom:2px;border:1px solid transparent;transition:.15s}
+.site-row:hover{background:#111827}
+.site-row.active{background:#111827;border-color:#2271b1}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot.ok{background:#10b981}
+.dot.err{background:#ef4444}
+.site-name{flex:1;font-weight:600}
+.conn-badge{font-size:9px;color:#6b7280}
+
+.sys-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}
+.sys-item{background:#111827;border:1px solid #1f2937;border-radius:3px;padding:6px 8px;font-size:10px}
+.sys-item .label{color:#6b7280}
+.sys-item .value{color:#e2e8f0;font-weight:700;margin-top:2px}
+
+.kb-item{background:#111827;border:1px solid #1f2937;border-radius:3px;padding:8px;margin-bottom:6px;font-size:11px}
+.kb-item strong{display:block;margin-bottom:3px}
+.kb-item p{color:#6b7280;font-size:10px;margin-top:2px}
+.type-badge{font-size:9px;background:#374151;padding:1px 5px;border-radius:3px;color:#9ca3af}
+
+.chk-row{display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;margin-bottom:6px}
+.chk-row input{width:auto}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo">🤖</span>
+  <h1>AI WordPress Agent</h1>
+  <span class="status-dot err" id="agent-dot"></span>
+  <span id="llm-badge" class="badge mock">mock</span>
+</div>
+<div style="padding:4px 12px;font-size:9px;color:#6b7280;background:#0d1117;border-bottom:1px solid #1f2937" id="agent-status">Checking...</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="task">⚡ Task</div>
+  <div class="tab" data-tab="page">🔍 Page</div>
+  <div class="tab" data-tab="sites">🌐 Sites</div>
+  <div class="tab" data-tab="kb">📚 KB</div>
+  <div class="tab" data-tab="system">⚙️ System</div>
+</div>
+
+<!-- TASK -->
+<div class="panel active" id="panel-task">
+  <div class="field">
+    <label>المهمة (Ctrl+Enter للتنفيذ)</label>
+    <textarea id="task-input" placeholder="مثال: حلل الموقع وحدّث الإضافات الآمنة فقط&#10;مثال: أنشئ كورس MasterStudy عن Python&#10;مثال: راجع Elementor وحسّن الصفحة الرئيسية"></textarea>
+  </div>
+  <div class="chk-row">
+    <input type="checkbox" id="chk-all-sites">
+    <label for="chk-all-sites">تنفيذ على كل المواقع</label>
+  </div>
+  <div class="row2">
+    <button class="btn btn-primary" id="btn-run">🚀 تنفيذ</button>
+    <button class="btn btn-ghost" id="btn-explain">🔍 شرح أولاً</button>
+  </div>
+  <div class="quick-grid">
+    <button class="quick-btn" data-quick="افحص الموقع وحدّث الإضافات الآمنة فقط">⬆ Smart Update</button>
+    <button class="quick-btn" data-quick="حلل الصفحة الرئيسية وأعطني تقرير UX">📊 UX Report</button>
+    <button class="quick-btn" data-quick="اقرأ debug.log وحدد المشاكل">🔴 Error Log</button>
+    <button class="quick-btn" data-quick="اعرض كل الكورسات وحالتها">🎓 Courses</button>
+  </div>
+  <div class="log" id="task-log">Ready.</div>
+</div>
+
+<!-- PAGE -->
+<div class="panel" id="panel-page">
+  <div class="row2">
+    <button class="btn btn-primary" id="btn-analyze">🔍 تحليل الصفحة</button>
+    <button class="btn btn-ghost" id="btn-learn">📚 Learn Page</button>
+  </div>
+  <div id="page-info" style="margin:8px 0"></div>
+  <div class="log" id="page-log">Press Analyze.</div>
+</div>
+
+<!-- SITES -->
+<div class="panel" id="panel-sites">
+  <div id="sites-list" style="margin-bottom:8px"></div>
+  <div class="field"><label>اسم الموقع</label><input type="text" id="ns-name" placeholder="my-site"></div>
+  <div class="field"><label>URL</label><input type="url" id="ns-url" placeholder="https://example.com"></div>
+  <div class="field"><label>API Key</label><input type="text" id="ns-key" placeholder="من Plugin Settings"></div>
+  <button class="btn btn-green" id="btn-add-site">➕ إضافة الموقع</button>
+</div>
+
+<!-- KB -->
+<div class="panel" id="panel-kb">
+  <div class="field">
+    <label>بحث في المعرفة</label>
+    <input type="text" id="kb-query" placeholder="ابحث...">
+  </div>
+  <button class="btn btn-primary" id="btn-kb-search">🔍 بحث</button>
+  <div class="field" style="margin-top:8px">
+    <label>تعلم من URL</label>
+    <input type="url" id="kb-url-inp" placeholder="https://docs.example.com">
+  </div>
+  <button class="btn btn-ghost" id="btn-kb-url">📥 Learn URL</button>
+  <div id="kb-results" style="margin-top:8px"></div>
+</div>
+
+<!-- SYSTEM -->
+<div class="panel" id="panel-system">
+  <div class="sys-grid">
+    <div class="sys-item"><div class="label">Uptime</div><div class="value" id="sys-uptime">—</div></div>
+    <div class="sys-item"><div class="label">Tasks</div><div class="value" id="sys-tasks">0</div></div>
+    <div class="sys-item"><div class="label">Success</div><div class="value" id="sys-rate">—</div></div>
+    <div class="sys-item"><div class="label">Sites</div><div class="value" id="sys-sites">—</div></div>
+    <div class="sys-item"><div class="label">Knowledge</div><div class="value" id="sys-kb">—</div></div>
+    <div class="sys-item"><div class="label">Tools</div><div class="value" id="sys-tools">—</div></div>
+  </div>
+  <div class="field"><label>Agent URL</label><input type="url" id="agent-url-inp" placeholder="http://127.0.0.1:5001"></div>
+  <button class="btn btn-primary" id="btn-save-url">💾 Save URL</button>
+  <div class="field" style="margin-top:8px">
+    <label>LLM Provider</label>
+    <select id="llm-provider-sel">
+      <option value="mock">Mock (Testing)</option>
+      <option value="claude">Claude (Anthropic)</option>
+      <option value="openai">OpenAI (GPT)</option>
+      <option value="ollama">Ollama (Local)</option>
+    </select>
+  </div>
+  <div class="field"><label>API Key</label><input type="password" id="llm-key-inp" placeholder="sk-..."></div>
+  <div class="field"><label>Model</label><input type="text" id="llm-model-inp" placeholder="claude-sonnet-4-5"></div>
+  <div class="row2">
+    <button class="btn btn-primary" id="btn-save-llm">💾 Save LLM</button>
+    <button class="btn btn-ghost" id="btn-open-dash">🖥 Dashboard</button>
+  </div>
+  <div style="font-size:10px;color:#6b7280;margin-top:6px;text-align:center">LLM: <strong id="sys-llm">—</strong></div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

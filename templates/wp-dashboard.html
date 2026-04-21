@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI WordPress Control Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --wp-blue:    #2271b1;
+  --wp-dark:    #1d2327;
+  --wp-sidebar: #2c3338;
+  --wp-hover:   #2271b1;
+  --wp-bg:      #f0f0f1;
+  --wp-card:    #fff;
+  --wp-border:  #c3c4c7;
+  --green:      #00a32a;
+  --red:        #d63638;
+  --orange:     #dba617;
+  --text:       #1d2327;
+  --muted:      #646970;
+  --accent:     #2271b1;
+  --mono:       'Space Mono', monospace;
+  --font:       'Noto Sans Arabic', -apple-system, sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--wp-bg);color:var(--text);font-family:var(--font);min-height:100vh;display:flex;flex-direction:column}
+
+/* ── TOPBAR ─────────────────────────────── */
+.wp-topbar{background:var(--wp-dark);color:#fff;height:32px;display:flex;align-items:center;padding:0 16px;gap:20px;font-size:13px;position:sticky;top:0;z-index:200}
+.wp-topbar .brand{font-weight:700;color:#a7aaad;letter-spacing:.5px}
+.wp-topbar .brand span{color:#fff}
+.wp-topbar .topbar-right{margin-right:auto;display:flex;gap:16px;align-items:center}
+.site-selector{background:transparent;border:none;color:#a7aaad;font-size:13px;cursor:pointer;padding:4px 8px;border-radius:3px}
+.site-selector:hover{background:rgba(255,255,255,.1);color:#fff}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.pill.connected{background:#00a32a22;color:#00a32a}
+.pill.disconnected{background:#d6363822;color:#d63638}
+
+/* ── LAYOUT ─────────────────────────────── */
+.wp-layout{display:flex;flex:1;min-height:calc(100vh - 32px)}
+
+/* ── SIDEBAR ─────────────────────────────── */
+.wp-sidebar{width:220px;background:var(--wp-sidebar);flex-shrink:0;display:flex;flex-direction:column}
+.sidebar-site{padding:16px;border-bottom:1px solid rgba(255,255,255,.07)}
+.sidebar-site h4{color:#a7aaad;font-size:11px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+.site-item{padding:6px 10px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;color:#ccc;margin-bottom:2px;transition:.15s}
+.site-item:hover,.site-item.active{background:var(--wp-hover);color:#fff}
+.site-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.site-dot.ok{background:var(--green)}
+.site-dot.err{background:var(--red)}
+
+.sidebar-menu{padding:8px 0;flex:1;overflow-y:auto}
+.menu-section{color:#a7aaad;font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding:12px 16px 4px}
+.menu-item{display:flex;align-items:center;gap:10px;padding:7px 16px;color:#ccc;cursor:pointer;font-size:13px;transition:.15s;text-decoration:none}
+.menu-item:hover,.menu-item.active{background:var(--wp-hover);color:#fff}
+.menu-item .icon{width:18px;text-align:center;font-size:14px}
+
+/* ── MAIN ─────────────────────────────── */
+.wp-main{flex:1;overflow-y:auto;padding:24px}
+
+.page-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.page-title .badge{background:var(--wp-blue);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px}
+
+/* ── CARDS GRID ─────────────────────────── */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-bottom:24px}
+.wp-card{background:var(--wp-card);border:1px solid var(--wp-border);border-radius:4px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.wp-card h3{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px;color:var(--text);border-bottom:1px solid var(--wp-border);padding-bottom:8px}
+.stat-number{font-size:32px;font-weight:700;color:var(--wp-blue);font-family:var(--mono)}
+.stat-label{font-size:12px;color:var(--muted);margin-top:2px}
+.card-ok{border-top:3px solid var(--green)}
+.card-warn{border-top:3px solid var(--orange)}
+.card-err{border-top:3px solid var(--red)}
+.card-blue{border-top:3px solid var(--wp-blue)}
+
+/* ── TABLE ─────────────────────────────── */
+.wp-table{width:100%;border-collapse:collapse;background:var(--wp-card);border:1px solid var(--wp-border);border-radius:4px;overflow:hidden;margin-bottom:16px}
+.wp-table th{background:#f6f7f7;color:var(--text);font-size:13px;font-weight:600;padding:10px 14px;text-align:right;border-bottom:1px solid var(--wp-border)}
+.wp-table td{padding:10px 14px;font-size:13px;border-bottom:1px solid #f0f0f1;vertical-align:middle}
+.wp-table tr:last-child td{border-bottom:none}
+.wp-table tr:hover td{background:#f6f7f7}
+
+/* ── BADGES ─────────────────────────────── */
+.badge-active{background:#00a32a22;color:#00a32a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-inactive{background:#f0f0f0;color:#646970;padding:2px 8px;border-radius:10px;font-size:11px}
+.badge-update{background:#dba61722;color:#8a6914;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+
+/* ── BUTTONS ─────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:3px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;font-family:var(--font);transition:.15s}
+.btn-primary{background:var(--wp-blue);color:#fff;border-color:var(--wp-blue)}
+.btn-primary:hover{background:#135e96}
+.btn-secondary{background:#fff;color:var(--text);border-color:var(--wp-border)}
+.btn-secondary:hover{background:#f6f7f7;border-color:#999}
+.btn-danger{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-green{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-sm{padding:4px 10px;font-size:12px}
+
+/* ── CONTROL PANEL ─────────────────────────── */
+.control-panel{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;padding:16px;background:var(--wp-card);border:1px solid var(--wp-border);border-radius:4px}
+
+/* ── AI ANALYSIS ─────────────────────────── */
+.ai-analysis{background:linear-gradient(135deg,#1d2327 0%,#2271b1 100%);color:#fff;border-radius:8px;padding:20px;margin-bottom:20px}
+.ai-analysis h3{margin-bottom:12px;font-size:16px}
+.ai-tag{display:inline-block;background:rgba(255,255,255,.15);padding:3px 10px;border-radius:10px;font-size:12px;margin:3px}
+
+/* ── TASK INPUT ─────────────────────────── */
+.task-area{background:var(--wp-card);border:1px solid var(--wp-border);border-radius:4px;padding:16px;margin-bottom:16px}
+.task-area textarea{width:100%;border:1px solid var(--wp-border);border-radius:3px;padding:10px;font-family:var(--font);font-size:13px;resize:vertical;min-height:80px}
+.task-area textarea:focus{outline:none;border-color:var(--wp-blue);box-shadow:0 0 0 1px var(--wp-blue)}
+
+/* ── LOG ─────────────────────────────── */
+.log-area{background:#1d2327;border-radius:4px;padding:14px;font-family:var(--mono);font-size:11px;line-height:1.8;max-height:240px;overflow-y:auto;color:#a7aaad}
+.log-ok{color:#00a32a}
+.log-err{color:#d63638}
+.log-warn{color:#dba617}
+.log-info{color:#72aee6}
+
+/* ── LEARNDASH ─────────────────────────── */
+.course-card{background:var(--wp-card);border:1px solid var(--wp-border);border-radius:4px;padding:16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.course-info h4{font-size:14px;font-weight:600;margin-bottom:4px}
+.course-info span{font-size:12px;color:var(--muted)}
+
+/* ── RESPONSIVE ─────────────────────────── */
+@media(max-width:768px){.wp-sidebar{display:none}.cards-grid{grid-template-columns:1fr}}
+
+/* ── TABS ─────────────────────────────── */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--wp-border);margin-bottom:20px}
+.tab{padding:8px 16px;cursor:pointer;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.active{color:var(--wp-blue);border-bottom-color:var(--wp-blue);font-weight:600}
+.tab-content{display:none}.tab-content.active{display:block}
+</style>
+</head>
+<body>
+
+<!-- ── TOPBAR ── -->
+<div class="wp-topbar">
+  <div class="brand">🤖 <span>AI WordPress</span> Control Center</div>
+  <select class="site-selector" id="site-selector" onchange="switchSite(this.value)">
+    <option value="">— اختر موقع —</option>
+  </select>
+  <div class="topbar-right">
+    <span id="global-status" class="pill disconnected">⬤ Disconnected</span>
+    <span id="clock" style="font-size:11px;color:#a7aaad;font-family:var(--mono)"></span>
+  </div>
+</div>
+
+<div class="wp-layout">
+
+  <!-- ── SIDEBAR ── -->
+  <nav class="wp-sidebar">
+    <div class="sidebar-site">
+      <h4>المواقع</h4>
+      <div id="sites-list"></div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%" onclick="showModal('add-site-modal')">+ إضافة موقع</button>
+    </div>
+    <div class="sidebar-menu">
+      <div class="menu-section">لوحة التحكم</div>
+      <a class="menu-item active" onclick="showPage('overview')" href="#">    <span class="icon">🏠</span> Overview</a>
+      <a class="menu-item"       onclick="showPage('plugins')"  href="#">    <span class="icon">🔌</span> Plugins</a>
+      <a class="menu-item"       onclick="showPage('elementor')" href="#">   <span class="icon">🎨</span> Elementor</a>
+
+      <div class="menu-section">محتوى</div>
+      <a class="menu-item"       onclick="showPage('learndash')" href="#">   <span class="icon">🎓</span> MasterStudy</a>
+      <a class="menu-item"       onclick="showPage('media')"     href="#">   <span class="icon">🖼️</span> Media</a>
+      <a class="menu-item"       onclick="showPage('users')"     href="#">   <span class="icon">👥</span> Users</a>
+
+      <div class="menu-section">AI</div>
+      <a class="menu-item"       onclick="showPage('ai-task')"   href="#">   <span class="icon">⚡</span> AI Tasks</a>
+      <a class="menu-item"       onclick="showPage('knowledge')" href="#">   <span class="icon">📚</span> Knowledge</a>
+      <a class="menu-item"       onclick="showPage('heal')"      href="#">   <span class="icon">🛡️</span> Self-Heal</a>
+
+      <div class="menu-section">إعدادات</div>
+      <a class="menu-item"       onclick="showPage('settings')"  href="#">   <span class="icon">⚙️</span> Settings</a>
+    </div>
+  
+      <div class="divider" style="height:1px;background:rgba(255,255,255,.07);margin:12px 0;"></div>
+      <div class="menu-section">النظام</div>
+
+      <!-- System Stats mini -->
+      <div style="padding:8px 12px;font-size:11px;color:#a7aaad;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>Uptime</span><span id="sys-uptime" style="color:#fff">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span>Tasks</span><span id="sys-tasks" style="color:#fff">0</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span>Success</span><span id="sys-rate" style="color:#10b981">—</span>
+        </div>
+      </div>
+
+      <div class="menu-section" style="margin-top:8px;">LLM</div>
+      <div style="padding:6px 12px;font-size:11px;color:#a7aaad;">
+        <div>Provider: <span id="llm-provider" style="color:#00e5ff">mock</span></div>
+        <div>Model: <span id="llm-model" style="color:#ccc">—</span></div>
+        <div>Key: <span id="llm-key" style="color:#f59e0b">❌ No key</span></div>
+      </div>
+
+    </nav>
+
+  <!-- ── MAIN ── -->
+  <main class="wp-main">
+
+    <!-- ══ OVERVIEW PAGE ══ -->
+    <div id="page-overview" class="tab-content active">
+      <div class="page-title">🏠 Site Overview <span class="badge" id="site-badge">No site selected</span></div>
+
+      <div class="cards-grid" id="overview-cards">
+        <div class="wp-card card-blue"><h3>⚡ Connection</h3><div class="stat-number" id="ov-status">—</div><div class="stat-label">الحالة الحالية</div></div>
+        <div class="wp-card card-ok"><h3>🔌 Active Plugins</h3><div class="stat-number" id="ov-plugins">—</div><div class="stat-label">إضافة مفعّلة</div></div>
+        <div class="wp-card card-blue"><h3>📄 Pages</h3><div class="stat-number" id="ov-pages">—</div><div class="stat-label">صفحة منشورة</div></div>
+        <div class="wp-card card-warn"><h3>🔄 Updates</h3><div class="stat-number" id="ov-updates">—</div><div class="stat-label">تحديث متاح</div></div>
+      </div>
+
+      
+
+      <!-- Tools & Feedback Row -->
+      <div class="cards-grid" style="grid-template-columns:1fr 1fr;margin-top:0;">
+
+        <!-- Tools Panel -->
+        <div class="wp-card card-blue">
+          <h3>🔧 Active Tools <span id="tools-health" style="font-size:10px;color:var(--muted);font-weight:400"></span></h3>
+          <div id="tools-panel" style="font-size:12px;color:var(--muted);">Loading...</div>
+        </div>
+
+        <!-- Feedback Panel -->
+        <div class="wp-card card-ok">
+          <h3>📈 Performance</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div style="text-align:center;">
+              <div class="stat-number" id="fb-total" style="font-size:24px;">0</div>
+              <div class="stat-label">Tasks</div>
+            </div>
+            <div style="text-align:center;">
+              <div class="stat-number" id="fb-rate" style="font-size:24px;color:var(--green)">—</div>
+              <div class="stat-label">Success Rate</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Avg: <strong id="fb-avg">—</strong></div>
+          <div style="font-size:11px;font-weight:600;margin-bottom:4px;">💡 Suggestions:</div>
+          <div id="fb-tips" style="color:var(--muted);font-size:11px;">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Site Latency Badge -->
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+        Latency: <strong id="site-latency">—</strong>
+      </div>
+
+      <div class="ai-analysis" id="ai-analysis-box">
+        <h3>🤖 AI Site Analysis</h3>
+        <p id="ai-site-type" style="font-size:18px;margin-bottom:10px">اختر موقعاً لبدء التحليل</p>
+        <div id="ai-problems"></div>
+        <div id="ai-suggestions" style="margin-top:10px"></div>
+      </div>
+
+      <div class="wp-card">
+        <h3>📊 Site Info</h3>
+        <table class="wp-table" id="site-info-table">
+          <tr><td style="color:var(--muted)">WordPress Version</td><td id="si-wpv">—</td></tr>
+          <tr><td style="color:var(--muted)">PHP Version</td><td id="si-phpv">—</td></tr>
+          <tr><td style="color:var(--muted)">Active Theme</td><td id="si-theme">—</td></tr>
+          <tr><td style="color:var(--muted)">Memory Limit</td><td id="si-mem">—</td></tr>
+          <tr><td style="color:var(--muted)">Admin Email</td><td id="si-email">—</td></tr>
+          <tr><td style="color:var(--muted)">Debug Mode</td><td id="si-debug">—</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ PLUGINS PAGE ══ -->
+    <div id="page-plugins" class="tab-content">
+      <div class="page-title">🔌 Plugins Manager <span id="plugins-count" class="badge" style="font-size:12px"></span></div>
+      <div class="control-panel">
+        <button class="btn btn-primary" onclick="fetchPlugins()">🔄 تحديث القائمة</button>
+        <button class="btn btn-green"   onclick="updateAllPlugins()">⬆️ تحديث كل الإضافات</button>
+        <input id="plugin-search" type="text" placeholder="بحث في الإضافات..." onkeyup="filterPlugins()" style="padding:6px 10px;border:1px solid var(--wp-border);border-radius:3px;font-size:13px;margin-right:auto">
+        <span id="plugins-status" style="font-size:12px;color:var(--muted);align-self:center"></span>
+      </div>
+      <table class="wp-table" id="plugins-table">
+        <thead><tr><th>الاسم والملف</th><th>الإصدار</th><th>الحالة</th><th>تحديث</th><th>تفعيل / تعطيل</th></tr></thead>
+        <tbody id="plugins-tbody"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">اختر موقعاً ثم اضغط تحديث القائمة</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- ══ ELEMENTOR PAGE ══ -->
+    <div id="page-elementor" class="tab-content">
+      <div class="page-title">🎨 Elementor Control</div>
+      <div class="wp-card">
+        <h3>قراءة / تعديل بيانات Elementor</h3>
+        <div style="display:flex;gap:10px;margin-bottom:12px">
+          <input type="number" id="elementor-post-id" placeholder="Post ID" class="regular-text" style="padding:6px 10px;border:1px solid var(--wp-border);border-radius:3px;font-size:13px">
+          <button class="btn btn-primary" onclick="fetchElementorData()">📥 تحميل البيانات</button>
+        </div>
+        <textarea id="elementor-data-area" style="width:100%;height:300px;font-family:var(--mono);font-size:11px;padding:10px;border:1px solid var(--wp-border);border-radius:3px" placeholder="ستظهر بيانات Elementor JSON هنا..."></textarea>
+        <div style="margin-top:10px;display:flex;gap:10px">
+          <button class="btn btn-green" onclick="saveElementorData()">💾 حفظ التعديلات</button>
+          <button class="btn btn-secondary" onclick="sendElementorToAI()">🤖 تحليل بالـ AI</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MASTERSTUDY PAGE ══ -->
+    <div id="page-learndash" class="tab-content">
+      <div class="page-title">🎓 MasterStudy LMS</div>
+
+      <!-- AI Course Generation -->
+      <div class="wp-card card-blue" style="margin-bottom:16px">
+        <h3>🤖 إنشاء كورس كامل بالذكاء الاصطناعي</h3>
+        <div style="display:grid;grid-template-columns:1fr 120px 120px;gap:10px;margin-top:12px;align-items:end">
+          <div>
+            <label style="font-size:12px;color:var(--muted)">موضوع الكورس</label>
+            <input id="ms-topic" type="text" style="width:100%;padding:7px;border:1px solid var(--wp-border);border-radius:3px;font-size:13px;margin-top:4px" placeholder="مثال: Python للمبتدئين">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--muted)">عدد الدروس</label>
+            <input id="ms-lessons" type="number" value="5" min="1" max="20" style="width:100%;padding:7px;border:1px solid var(--wp-border);border-radius:3px;font-size:13px;margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--muted)">اللغة</label>
+            <select id="ms-lang" style="width:100%;padding:7px;border:1px solid var(--wp-border);border-radius:3px;font-size:13px;margin-top:4px">
+              <option value="ar">العربية</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+          <button class="btn btn-primary" onclick="aiCreateCourse()">⚡ توليد كورس كامل بـ AI</button>
+          <div id="ms-ai-result" style="font-size:13px;color:var(--muted)"></div>
+        </div>
+      </div>
+
+      <!-- Manual Course Creation -->
+      <div class="control-panel">
+        <button class="btn btn-secondary" onclick="fetchCourses()">🔄 تحميل الكورسات</button>
+        <button class="btn btn-green"     onclick="showCreateCourse()">➕ إنشاء كورس يدوي</button>
+      </div>
+      <div id="courses-list"></div>
+
+      <div id="create-course-form" style="display:none" class="wp-card">
+        <h3>➕ إنشاء كورس يدوي</h3>
+        <div style="display:grid;gap:12px">
+          <div><label style="font-size:13px;font-weight:500">عنوان الكورس</label><br><input type="text" id="course-title" style="width:100%;padding:8px;border:1px solid var(--wp-border);border-radius:3px;margin-top:4px;font-size:13px"></div>
+          <div><label style="font-size:13px;font-weight:500">الوصف</label><br><textarea id="course-content" style="width:100%;height:100px;padding:8px;border:1px solid var(--wp-border);border-radius:3px;margin-top:4px;font-size:13px"></textarea></div>
+          <div style="display:flex;gap:10px">
+            <select id="course-status" style="padding:7px;border:1px solid var(--wp-border);border-radius:3px;font-size:13px"><option value="draft">Draft</option><option value="publish">Publish</option></select>
+            <button class="btn btn-green" onclick="createCourse()">✅ إنشاء</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('create-course-form').style.display='none'">إلغاء</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ AI TASK PAGE ══ -->
+    <div id="page-ai-task" class="tab-content">
+      <div class="page-title">⚡ AI Task Runner</div>
+      <div class="task-area">
+        <div style="margin-bottom:8px;font-size:13px;font-weight:500">أكتب مهمة للـ AI Agent:</div>
+        <textarea id="task-input" placeholder="مثال: حدّث كل الإضافات على جميع المواقع&#10;مثال: أنشئ كورس LearnDash باسم 'مقدمة في البرمجة'&#10;مثال: تحليل مشاكل الموقع وإصلاحها تلقائياً"></textarea>
+        <div style="margin-top:10px;display:flex;gap:10px;align-items:center">
+          <button class="btn btn-primary" onclick="runAITask()">🚀 تنفيذ</button>
+          <button class="btn btn-secondary" onclick="explainTask()">🔍 شرح قبل التنفيذ</button>
+          <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="all-sites"> تنفيذ على كل المواقع</label>
+        </div>
+      </div>
+
+      <div class="wp-card">
+        <h3>📋 نتيجة التنفيذ</h3>
+        <div class="log-area" id="task-result">في انتظار المهام...</div>
+      </div>
+    </div>
+
+    <!-- ══ KNOWLEDGE PAGE ══ -->
+    <div id="page-knowledge" class="tab-content">
+      <div class="page-title">📚 Knowledge Base</div>
+      <div class="cards-grid">
+        <div class="wp-card card-blue">
+          <h3>📄 رفع ملف</h3>
+          <input type="file" id="kb-file" accept=".pdf,.txt,.md,.php,.js" style="font-size:12px;margin-bottom:10px">
+          <br>
+          <input type="text" id="kb-tags" placeholder="tags (plugin, theme, ...)" style="width:100%;padding:6px;border:1px solid var(--wp-border);border-radius:3px;font-size:12px;margin-bottom:10px">
+          <button class="btn btn-primary btn-sm" onclick="uploadKnowledge()">📤 رفع وتعلم</button>
+        </div>
+        <div class="wp-card card-blue">
+          <h3>🌐 تعلم من URL</h3>
+          <input type="url" id="kb-url" placeholder="https://docs.example.com/..." style="width:100%;padding:6px;border:1px solid var(--wp-border);border-radius:3px;font-size:12px;margin-bottom:10px">
+          <button class="btn btn-primary btn-sm" onclick="learnFromURL()">🔗 تحميل وتعلم</button>
+        </div>
+        <div class="wp-card card-blue">
+          <h3>🔌 تعلم Plugin كامل</h3>
+          <input type="text" id="kb-plugin-path" placeholder="C:\wamp\www\wp-content\plugins\plugin-name" style="width:100%;padding:6px;border:1px solid var(--wp-border);border-radius:3px;font-size:12px;margin-bottom:10px">
+          <button class="btn btn-primary btn-sm" onclick="learnPlugin()">📦 تعلم Plugin</button>
+        </div>
+      </div>
+      <div class="wp-card" style="margin-top:16px">
+        <h3>🔍 بحث في المعرفة</h3>
+        <div style="display:flex;gap:10px;margin-bottom:12px">
+          <input type="text" id="kb-search" placeholder="ابحث..." style="flex:1;padding:7px;border:1px solid var(--wp-border);border-radius:3px;font-size:13px">
+          <button class="btn btn-primary" onclick="searchKnowledge()">بحث</button>
+        </div>
+        <div id="kb-results"></div>
+      </div>
+    </div>
+
+    <!-- ══ SELF-HEAL PAGE ══ -->
+    <div id="page-heal" class="tab-content">
+      <div class="page-title">🛡️ Self-Heal Firewall</div>
+      <div class="control-panel">
+        <button class="btn btn-danger" onclick="readErrorLog()">🔴 قراءة Error Log</button>
+        <button class="btn btn-green"  onclick="runAutoHeal()">🔧 إصلاح تلقائي</button>
+      </div>
+      <div class="wp-card">
+        <h3>📋 آخر الأخطاء</h3>
+        <div class="log-area" id="error-log-area">اضغط "قراءة Error Log" للبدء</div>
+      </div>
+    </div>
+
+    <!-- ══ SETTINGS PAGE ══ -->
+    <div id="page-settings" class="tab-content">
+      <div class="page-title">⚙️ Settings</div>
+
+      <!-- Add Site -->
+      <div class="wp-card">
+        <h3>🌐 إضافة موقع WordPress</h3>
+        <div style="display:grid;gap:12px;max-width:500px">
+          <div><label style="font-size:13px">اسم الموقع</label><br><input type="text" id="ns-name" style="width:100%;padding:7px;border:1px solid var(--wp-border);border-radius:3px;margin-top:4px;font-size:13px" placeholder="my-site"></div>
+          <div><label style="font-size:13px">URL الموقع</label><br><input type="text" id="ns-url" style="width:100%;padding:7px;border:1px solid var(--wp-border);border-radius:3px;margin-top:4px;font-size:13px" placeholder="https://yoursite.com"></div>
+          <div><label style="font-size:13px">API Key <small style="color:var(--muted)">(من إعدادات الـ Plugin في WordPress)</small></label><br><input type="text" id="ns-key" style="width:100%;padding:7px;border:1px solid var(--wp-border);border-radius:3px;margin-top:4px;font-size:13px" placeholder="aiwa_xxxxxxxxxxxx"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="addSite()">➕ إضافة الموقع</button>
+            <button class="btn btn-secondary" onclick="testNewSiteConnection()">🔌 اختبار الاتصال</button>
+          </div>
+          <div id="add-site-result" style="font-size:13px"></div>
+        </div>
+      </div>
+
+      <!-- Test Connection for current site -->
+      <div class="wp-card" style="margin-top:16px">
+        <h3>🔌 اختبار الاتصال بالموقع الحالي</h3>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="btn btn-secondary" onclick="testCurrentConnection()">🔍 اختبار الاتصال</button>
+          <div id="connection-test-result" style="font-size:13px;color:var(--muted)">اختر موقعاً أولاً</div>
+        </div>
+      </div>
+
+      <!-- Agent URL -->
+      <div class="wp-card" style="margin-top:16px">
+        <h3>🤖 Agent URL</h3>
+        <div style="display:flex;gap:10px;max-width:500px">
+          <input type="url" id="agent-url-input" style="flex:1;padding:7px;border:1px solid var(--wp-border);border-radius:3px;font-size:13px" placeholder="http://localhost:5001" value="http://localhost:5001">
+          <button class="btn btn-primary" onclick="saveAgentURL()">حفظ</button>
+        </div>
+      </div>
+    </div>
+
+    
+      <div class="wp-card" style="margin-top:16px;">
+        <h3>🤖 LLM Configuration</h3>
+        <div style="display:grid;gap:12px;max-width:500px;">
+          <div>
+            <label style="font-size:13px;">Provider</label><br>
+            <select id="llm-provider-sel" style="width:100%;padding:7px;border:1px solid var(--wp-border);border-radius:3px;margin-top:4px;font-size:13px;">
+              <option value="mock">Mock (Testing — no API needed)</option>
+              <option value="claude">Claude (Anthropic)</option>
+              <option value="openai">OpenAI (GPT)</option>
+              <option value="ollama">Ollama (Local — Free)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:13px;">API Key</label><br>
+            <input type="password" id="llm-key-input" placeholder="sk-..." style="width:100%;padding:7px;border:1px solid var(--wp-border);border-radius:3px;margin-top:4px;font-size:13px;">
+          </div>
+          <div>
+            <label style="font-size:13px;">Model</label><br>
+            <input type="text" id="llm-model-input" placeholder="claude-sonnet-4-5 / gpt-4o-mini / llama3" style="width:100%;padding:7px;border:1px solid var(--wp-border);border-radius:3px;margin-top:4px;font-size:13px;">
+          </div>
+          <div>
+            <label style="font-size:13px;">Base URL (Ollama only)</label><br>
+            <input type="url" id="llm-base-url" placeholder="http://localhost:11434" style="width:100%;padding:7px;border:1px solid var(--wp-border);border-radius:3px;margin-top:4px;font-size:13px;">
+          </div>
+          <button class="btn btn-primary" onclick="saveLLMConfig()">💾 Save LLM Config</button>
+          <p style="font-size:11px;color:var(--muted);">
+            💡 Ollama = local free LLM. Claude/OpenAI require API key.<br>
+            Current status: Provider=<strong id="llm-provider-badge">—</strong>, Key=<strong id="llm-key-badge">—</strong>
+          </p>
+        </div>
+      </div>
+
+    <!-- ══ MEDIA & USERS ══ -->
+    <div id="page-media" class="tab-content">
+      <div class="page-title">🖼️ Media Manager</div>
+      <div class="control-panel"><button class="btn btn-primary" onclick="fetchMedia()">🔄 تحميل الميديا</button></div>
+      <div id="media-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px"></div>
+    </div>
+    <div id="page-users" class="tab-content">
+      <div class="page-title">👥 User Management <span id="users-count" class="badge" style="font-size:12px"></span></div>
+      <div class="control-panel">
+        <button class="btn btn-primary" onclick="fetchUsers()">🔄 تحميل المستخدمين</button>
+        <input id="user-search" type="text" placeholder="بحث..." onkeyup="filterUsers()" style="padding:6px 10px;border:1px solid var(--wp-border);border-radius:3px;font-size:13px">
+      </div>
+      <table class="wp-table">
+        <thead><tr><th>ID</th><th>Username</th><th>Email</th><th>الاسم</th><th>الدور</th><th>تاريخ التسجيل</th><th>إجراء</th></tr></thead>
+        <tbody id="users-tbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">اختر موقعاً ثم اضغط تحميل</td></tr></tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+const state = {
+  sites: JSON.parse(localStorage.getItem('aiwa_sites') || '[]'),
+  currentSite: null,
+  agentUrl: localStorage.getItem('aiwa_agent_url') || 'http://localhost:5001',
+};
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+window.onload = async () => {
+  updateClock();
+  setInterval(updateClock, 1000);
+  const agentInput = document.getElementById('agent-url-input');
+  if (agentInput) agentInput.value = state.agentUrl;
+
+  // Load sites from server (not just localStorage)
+  await loadSitesFromServer();
+
+  if (state.sites.length) {
+    autoSelectSite(state.sites[0]);
+    // Auto-select in dropdown
+    const sel = document.getElementById('site-selector');
+    if (sel && state.sites[0]) sel.value = state.sites[0].name;
+  }
+};
+
+async function loadSitesFromServer() {
+  try {
+    const r = await fetch(state.agentUrl + '/wp/sites');
+    if (!r.ok) return;
+    const d = await r.json();
+    const serverSites = d.sites || [];
+    // Merge with localStorage (keep api_key from localStorage)
+    serverSites.forEach(ss => {
+      const local = state.sites.find(x => x.name === ss.name);
+      if (!local) {
+        state.sites.push({ name: ss.name, url: ss.url, key: '', connected: ss.connected === true });
+      } else {
+        local.connected = ss.connected === true;
+        local.url       = ss.url;
+      }
+    });
+    localStorage.setItem('aiwa_sites', JSON.stringify(state.sites));
+    renderSitesList();
+  } catch(e) {}
+}
+
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('ar-EG');
+}
+
+// ═══════════════════════════════════════
+//  PAGES
+// ═══════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('page-' + name)?.classList.add('active');
+  event?.currentTarget?.classList.add('active');
+}
+
+// ═══════════════════════════════════════
+//  AGENT API
+// ═══════════════════════════════════════
+async function agentPost(endpoint, data) {
+  try {
+    const r = await fetch(state.agentUrl + endpoint, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!r.ok && r.status === 404) return {success: false, error: 'Endpoint not found (404)'};
+    return await r.json();
+  } catch(e) {
+    if (e.name === 'TimeoutError') return {success: false, error: 'Request timeout — server not responding'};
+    return {success: false, error: e.message || 'Network error'};
+  }
+}
+async function agentGet(endpoint) {
+  try {
+    const r = await fetch(state.agentUrl + endpoint, {signal: AbortSignal.timeout(10000)});
+    return await r.json();
+  } catch(e) {
+    return {success: false, error: e.message};
+  }
+}
+
+// WP REST via Agent proxy
+async function wpGet(path) {
+  if (!state.currentSite) return {error: 'No site selected'};
+  return agentPost('/wp/proxy', {site: state.currentSite.name, method: 'GET', path});
+}
+async function wpPost(path, data) {
+  if (!state.currentSite) return {error: 'No site selected'};
+  return agentPost('/wp/proxy', {site: state.currentSite.name, method: 'POST', path, data});
+}
+
+// ═══════════════════════════════════════
+//  SITES
+// ═══════════════════════════════════════
+function addSite() {
+  const name = document.getElementById('ns-name').value.trim();
+  const rawUrl = document.getElementById('ns-url').value.trim();
+  const url = rawUrl.replace(/^\/+/, '').replace(/\/+$/, '');
+  const key  = document.getElementById('ns-key').value.trim();
+  if (!name || !url || !key) return alert('أدخل كل الحقول');
+  state.sites.push({name, url, key, connected: false});
+  localStorage.setItem('aiwa_sites', JSON.stringify(state.sites));
+  renderSitesList();
+  // Register on agent
+  fetch(state.agentUrl + '/wp/add-site', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, url, api_key: key})
+    }).then(r=>r.json()).then(d=>{
+      if(d.success){ log('✅ تم: '+name+' '+(d.connected?'(متصل)':''), 'info'); switchSite(name); }
+      else { log('❌ '+d.error, 'err'); }
+      loadSitesFromServer();
+    });
+  document.getElementById('ns-name').value = '';
+  document.getElementById('ns-url').value  = '';
+  document.getElementById('ns-key').value  = '';
+}
+
+function renderSitesList() {
+  const sel  = document.getElementById('site-selector');
+  const list = document.getElementById('sites-list');
+  if (sel) {
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">— اختر موقع —</option>';
+    state.sites.forEach(s => {
+      sel.innerHTML += `<option value="${s.name}">${s.connected ? '🟢' : '🔴'} ${s.name}</option>`;
+    });
+    if (prev) sel.value = prev;
+  }
+  if (list) {
+    list.innerHTML = '';
+    if (!state.sites.length) {
+      list.innerHTML = '<div style="color:#6b7280;font-size:11px;padding:8px;text-align:center">لا يوجد مواقع<br><small>أضف موقعاً من الإعدادات</small></div>';
+      return;
+    }
+    state.sites.forEach(s => {
+      list.innerHTML += `<div class="site-item ${s.name === state.currentSite?.name ? 'active' : ''}" style="justify-content:space-between">
+        <span onclick="switchSite('${s.name}');document.getElementById('site-selector').value='${s.name}'" style="display:flex;align-items:center;gap:6px;flex:1;cursor:pointer">
+          <span class="site-dot ${s.connected ? 'ok' : 'err'}"></span>
+          <span style="font-size:12px">${s.name}</span>
+        </span>
+        <span style="display:flex;gap:3px;flex-shrink:0">
+          <button onclick="event.stopPropagation();editSite('${s.name}')" title="تعديل" style="background:none;border:none;cursor:pointer;color:#a7aaad;font-size:11px;padding:2px 4px" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#a7aaad'">✏️</button>
+          <button onclick="event.stopPropagation();deleteSite('${s.name}')" title="حذف" style="background:none;border:none;cursor:pointer;color:#a7aaad;font-size:11px;padding:2px 4px" onmouseover="this.style.color='#d63638'" onmouseout="this.style.color='#a7aaad'">🗑️</button>
+        </span>
+      </div>`;
+    });
+  }
+}
+
+function switchSite(name) {
+  state.currentSite = state.sites.find(s => s.name === name) || null;
+  document.getElementById('site-badge').textContent = state.currentSite ? state.currentSite.name : 'No site';
+  if (state.currentSite) loadSiteOverview();
+}
+
+function editSite(name) {
+  const s = state.sites.find(x => x.name === name);
+  if (!s) return;
+  document.getElementById('edit-site-name').value    = s.name;
+  document.getElementById('edit-site-url').value     = s.url  || '';
+  document.getElementById('edit-site-key').value     = s.key  || '';
+  document.getElementById('edit-site-modal').style.display = 'flex';
+}
+
+async function saveEditSite() {
+  const name = document.getElementById('edit-site-name').value;
+  const url  = document.getElementById('edit-site-url').value.trim();
+  const key  = document.getElementById('edit-site-key').value.trim();
+  const r    = await agentPost('/wp/sites/update', {name, url, api_key: key});
+  if (r && r.success) {
+    const s = state.sites.find(x => x.name === name);
+    if (s) { if (url) s.url = url; if (key) s.key = key; }
+    localStorage.setItem('aiwa_sites', JSON.stringify(state.sites));
+    log('✅ تم تحديث الموقع: ' + name, 'info');
+    document.getElementById('edit-site-modal').style.display = 'none';
+    renderSitesList();
+  } else {
+    log('❌ ' + (r?.error || 'فشل التحديث'), 'err');
+  }
+}
+
+async function deleteSite(name) {
+  if (!confirm(`هل تريد حذف الموقع "${name}" نهائياً؟`)) return;
+  const r = await agentPost('/wp/sites/delete', {name});
+  if (r && r.success) {
+    state.sites = state.sites.filter(x => x.name !== name);
+    localStorage.setItem('aiwa_sites', JSON.stringify(state.sites));
+    if (state.currentSite?.name === name) {
+      state.currentSite = null;
+      document.getElementById('site-badge').textContent = 'No site';
+    }
+    log('🗑️ تم حذف الموقع: ' + name, 'info');
+    renderSitesList();
+  } else {
+    log('❌ ' + (r?.error || 'فشل الحذف'), 'err');
+  }
+}
+
+function autoSelectSite(s) {
+  state.currentSite = s;
+  document.getElementById('site-selector').value = s.name;
+  document.getElementById('site-badge').textContent = s.name;
+}
+
+// ═══════════════════════════════════════
+//  OVERVIEW
+// ═══════════════════════════════════════
+async function loadSiteOverview() {
+  if (!state.currentSite) return;
+  try {
+    const r = await agentPost('/wp/site-info', {site: state.currentSite.name});
+    if (r.success) {
+      const d = r.data;
+      document.getElementById('ov-status').textContent = r.connected ? '✅ OK' : '❌ Off';
+      document.getElementById('ov-plugins').textContent = d.plugins_active  ?? '—';
+      document.getElementById('ov-pages').textContent   = d.pages_count    ?? '—';
+      document.getElementById('ov-updates').textContent = d.updates_count  ?? '—';
+      document.getElementById('si-wpv').textContent     = d.wp_version    || '—';
+      document.getElementById('si-phpv').textContent    = d.php_version   || '—';
+      document.getElementById('si-theme').textContent   = (typeof d.theme === 'object' ? d.theme?.name : d.theme) || '—';
+      document.getElementById('si-mem').textContent     = d.memory_limit  || '—';
+      document.getElementById('si-email').textContent   = d.admin_email   || '—';
+      document.getElementById('si-debug').textContent   = d.debug_mode ? '⚠️ ON' : '✅ OFF';
+      document.getElementById('global-status').className = 'pill connected';
+      document.getElementById('global-status').textContent = '⬤ Connected';
+      // AI Analysis
+      analyzeCurrentSite();
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function analyzeCurrentSite() {
+  const r = await agentPost('/wp/analyze', {site: state.currentSite?.name});
+  if (r && r.type) {
+    document.getElementById('ai-site-type').textContent = '🏷️ ' + r.type;
+    document.getElementById('ai-problems').innerHTML = (r.problems||[]).map(p => `<span class="ai-tag">${p}</span>`).join('');
+    document.getElementById('ai-suggestions').innerHTML = (r.suggestions||[]).map(s => `<span class="ai-tag" style="background:rgba(0,163,42,.25)">${s}</span>`).join('');
+  }
+}
+
+// ═══════════════════════════════════════
+//  PLUGINS
+// ═══════════════════════════════════════
+let _pluginsData = [];
+async function fetchPlugins() {
+  if (!state.currentSite) { log('اختر موقعاً أولاً', 'err'); return; }
+  const status = document.getElementById('plugins-status');
+  const tbody  = document.getElementById('plugins-tbody');
+  status.textContent = '⏳ جارٍ التحميل...';
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">⏳ تحميل...</td></tr>';
+  const r = await agentPost('/wp/plugins', {site: state.currentSite.name});
+  if (r?.success && r.data?.plugins) {
+    _pluginsData = r.data.plugins;
+    renderPlugins(_pluginsData);
+    status.textContent = `${r.data.count} إضافة`;
+    document.getElementById('plugins-count').textContent = r.data.count;
+  } else {
+    const msg = r?.error || 'فشل الاتصال بالموقع';
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px"><span style="color:var(--red)">❌ ${msg}</span><br><small style="color:var(--muted)">تأكد من تثبيت AIWA Plugin على الموقع وصحة الـ API Key</small></td></tr>`;
+    status.textContent = 'خطأ';
+  }
+}
+
+function renderPlugins(plugins) {
+  const tbody = document.getElementById('plugins-tbody');
+  if (!plugins.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">لا توجد إضافات</td></tr>';
+    return;
+  }
+  tbody.innerHTML = plugins.map(p => {
+    const fileEsc = (p.file||'').replace(/'/g, "\\'");
+    const act = p.active ? 'deactivate' : 'activate';
+    return `<tr>
+      <td><strong style="font-size:13px">${p.name||p.slug}</strong><br><small style="color:var(--muted);font-size:11px">${p.file||p.slug}</small></td>
+      <td><code style="font-size:12px">${p.version||'—'}</code></td>
+      <td>${p.active ? '<span class="badge-active">فعّال</span>' : '<span class="badge-inactive">معطّل</span>'}</td>
+      <td>${p.has_update ? `<span class="badge-update">⬆ تحديث</span>` : '<span style="color:var(--green);font-size:12px">✅ محدّث</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" onclick="togglePlugin('${fileEsc}','${act}')">${p.active ? '⏸ تعطيل' : '▶ تفعيل'}</button>
+        ${p.has_update ? `<button class="btn btn-primary btn-sm" style="margin-right:4px" onclick="updatePlugin('${fileEsc}')">⬆ تحديث</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterPlugins() {
+  const q = document.getElementById('plugin-search')?.value.toLowerCase() || '';
+  renderPlugins(q ? _pluginsData.filter(p => (p.name||p.slug||'').toLowerCase().includes(q)) : _pluginsData);
+}
+
+async function updateAllPlugins() {
+  if (!state.currentSite) return;
+  log('🔄 جارٍ تحديث كل الإضافات...');
+  const r = await agentPost('/wp/update-plugins', {site: state.currentSite.name});
+  log(r.success ? '✅ تم التحديث' : '❌ ' + (r.error||'فشل'));
+  fetchPlugins();
+}
+
+async function updatePlugin(file) {
+  log(`⬆ تحديث: ${file}`);
+  const r = await agentPost('/wp/update-plugins', {site: state.currentSite?.name, plugin: file});
+  log(r.success ? `✅ تم: ${file}` : '❌ ' + (r.error||'فشل'));
+  fetchPlugins();
+}
+
+async function togglePlugin(file, action) {
+  const r = await agentPost('/wp/toggle-plugin', {site: state.currentSite?.name, plugin: file, action});
+  log(r.success ? `✅ ${action}: ${file}` : `❌ ${r.error||'فشل'}`);
+  fetchPlugins();
+}
+
+// ═══════════════════════════════════════
+//  ELEMENTOR
+// ═══════════════════════════════════════
+async function fetchElementorData() {
+  const postId = document.getElementById('elementor-post-id').value;
+  if (!postId) return alert('أدخل Post ID');
+  const r = await agentPost('/wp/elementor-get', {site: state.currentSite?.name, post_id: parseInt(postId)});
+  document.getElementById('elementor-data-area').value = r.success ? JSON.stringify(r.data?.elementor_data, null, 2) : 'Error: ' + r.error;
+}
+async function saveElementorData() {
+  const postId = document.getElementById('elementor-post-id').value;
+  const data   = document.getElementById('elementor-data-area').value;
+  const r = await agentPost('/wp/elementor-set', {site: state.currentSite?.name, post_id: parseInt(postId), elementor_data: JSON.parse(data)});
+  log(r.success ? '✅ Elementor data saved' : '❌ ' + r.error);
+}
+
+// ═══════════════════════════════════════
+//  MASTERSTUDY
+// ═══════════════════════════════════════
+async function aiCreateCourse() {
+  const topic   = document.getElementById('ms-topic')?.value.trim();
+  const lessons = parseInt(document.getElementById('ms-lessons')?.value || '5');
+  const lang    = document.getElementById('ms-lang')?.value || 'ar';
+  if (!topic) return alert('أدخل موضوع الكورس');
+  if (!state.currentSite) return alert('اختر موقعاً أولاً من الإعدادات');
+  const btn = document.querySelector('[onclick="aiCreateCourse()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ AI يولد الكورس...'; }
+  const r = await agentPost('/wp/masterstudy/ai-create', {
+    site: state.currentSite.name, topic, lessons_count: lessons, language: lang
+  });
+  if (btn) { btn.disabled = false; btn.textContent = '⚡ توليد كورس كامل بـ AI'; }
+  const el = document.getElementById('ms-ai-result');
+  if (r && r.success) {
+    el.innerHTML = `✅ <b>${r.course?.title || topic}</b> — ${r.lessons_created || lessons} درس`;
+    el.style.color = 'var(--green)';
+    fetchCourses();
+  } else {
+    el.innerHTML = '❌ ' + (r?.error || 'فشل التوليد');
+    el.style.color = 'var(--red)';
+  }
+}
+
+async function fetchCourses() {
+  const r = await agentPost('/wp/courses', {site: state.currentSite?.name});
+  const el = document.getElementById('courses-list');
+  if (r?.success && r.data?.courses) {
+    el.innerHTML = r.data.courses.map(c => `
+      <div class="course-card">
+        <div class="course-info"><h4>${c.title}</h4><span>ID: ${c.id} | ${c.status}</span></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm">✏️ تعديل</button>
+          <span class="badge-${c.status==='publish'?'active':'inactive'}">${c.status}</span>
+        </div>
+      </div>`).join('');
+  } else {
+    el.innerHTML = '<div class="wp-card" style="color:var(--red)">تأكد من تفعيل MasterStudy LMS على الموقع</div>';
+  }
+}
+function showCreateCourse() { document.getElementById('create-course-form').style.display = 'block'; }
+async function createCourse() {
+  const title   = document.getElementById('course-title').value;
+  const content = document.getElementById('course-content').value;
+  const status  = document.getElementById('course-status').value;
+  const r = await agentPost('/wp/create-course', {site: state.currentSite?.name, title, content, status});
+  log(r.success ? `✅ كورس "${title}" تم إنشاؤه (ID: ${r.data?.course_id})` : '❌ ' + r.error);
+  document.getElementById('create-course-form').style.display = 'none';
+  fetchCourses();
+}
+
+// ═══════════════════════════════════════
+//  AI TASK
+// ═══════════════════════════════════════
+async function runAITask(explain=false) {
+  const task   = document.getElementById('task-input').value.trim();
+  const allSites = document.getElementById('all-sites')?.checked;
+  if (!task) return;
+  logClear();
+  log(`🚀 تنفيذ المهمة: ${task}`);
+  const r = await agentPost('/run', {task, site: state.currentSite?.name, all_sites: allSites, explain});
+  log(r ? JSON.stringify(r, null, 2) : '❌ لم يُستجب');
+}
+async function explainTask() { runAITask(true); }
+
+// ═══════════════════════════════════════
+//  KNOWLEDGE
+// ═══════════════════════════════════════
+async function uploadKnowledge() {
+  const file = document.getElementById('kb-file').files[0];
+  const tags = document.getElementById('kb-tags').value;
+  if (!file) return alert('اختر ملفاً');
+  const fd = new FormData(); fd.append('file', file); fd.append('tags', tags);
+  const r  = await fetch(state.agentUrl + '/knowledge/upload', {method:'POST', body:fd});
+  const d  = await r.json();
+  log(d.success ? `✅ تم التعلم: ${file.name}` : '❌ ' + d.reason);
+}
+async function learnFromURL() {
+  const url = document.getElementById('kb-url').value;
+  const r   = await agentPost('/knowledge/learn-url', {url});
+  log(r.success ? '✅ تم التعلم من: ' + url : '❌ ' + r.reason);
+}
+async function learnPlugin() {
+  const path = document.getElementById('kb-plugin-path').value;
+  const r    = await agentPost('/knowledge/learn-plugin', {path});
+  log(r.success ? `✅ Plugin learned: ${r.plugin} (${r.files_processed} files)` : '❌ ' + r.reason);
+}
+async function searchKnowledge() {
+  const q = document.getElementById('kb-search').value;
+  const r = await agentPost('/knowledge/search', {query: q});
+  const el = document.getElementById('kb-results');
+  el.innerHTML = (r.results||[]).map(item => `
+    <div class="wp-card" style="margin-bottom:8px;padding:12px">
+      <strong style="font-size:13px">${item.title}</strong>
+      <span style="font-size:11px;color:var(--muted);margin-right:8px">[${item.type}]</span>
+      <p style="font-size:12px;color:var(--muted);margin-top:4px">${item.snippet}</p>
+    </div>`).join('') || '<p style="color:var(--muted)">لا نتائج</p>';
+}
+
+// ═══════════════════════════════════════
+//  HEAL
+// ═══════════════════════════════════════
+async function readErrorLog() {
+  const r = await agentPost('/wp/error-log', {site: state.currentSite?.name});
+  document.getElementById('error-log-area').innerHTML = (r.data?.log || '').split('\n').map(l =>
+    `<span class="${l.includes('Fatal')?'log-err':l.includes('Warning')?'log-warn':'log-info'}">${l}</span>`
+  ).join('\n');
+}
+async function runAutoHeal() {
+  log('🛡️ تشغيل Self-Heal...');
+  const r = await agentPost('/wp/auto-heal', {site: state.currentSite?.name});
+  log(r ? JSON.stringify(r, null, 2) : '❌');
+}
+
+// ═══════════════════════════════════════
+//  MEDIA & USERS
+// ═══════════════════════════════════════
+async function fetchMedia() {
+  const r = await agentPost('/wp/media', {site: state.currentSite?.name});
+  const el = document.getElementById('media-grid');
+  el.innerHTML = (r.data?.media||[]).map(m =>
+    m.mime?.startsWith('image') ? `<div style="background:#f0f0f1;border-radius:4px;overflow:hidden;aspect-ratio:1"><img src="${m.url}" style="width:100%;height:100%;object-fit:cover"></div>` : ''
+  ).join('');
+}
+let _usersData = [];
+async function fetchUsers() {
+  if (!state.currentSite) { log('اختر موقعاً أولاً', 'err'); return; }
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">⏳ تحميل...</td></tr>';
+  const r = await agentPost('/wp/users', {site: state.currentSite.name});
+  if (r?.success && r.data?.users) {
+    _usersData = r.data.users;
+    renderUsers(_usersData);
+    document.getElementById('users-count').textContent = r.data.count;
+  } else {
+    const msg = r?.error || 'فشل الاتصال';
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px"><span style="color:var(--red)">❌ ${msg}</span><br><small style="color:var(--muted)">تأكد من تثبيت AIWA Plugin وصحة الاتصال</small></td></tr>`;
+  }
+}
+
+function renderUsers(users) {
+  const tbody = document.getElementById('users-tbody');
+  if (!users.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">لا يوجد مستخدمون</td></tr>';
+    return;
+  }
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td style="font-size:12px;color:var(--muted)">${u.id||'—'}</td>
+      <td><strong style="font-size:13px">${u.username||'—'}</strong></td>
+      <td style="font-size:12px">${u.email||'—'}</td>
+      <td style="font-size:12px">${u.name||'—'}</td>
+      <td><span class="badge-${(u.role||'').includes('admin')?'active':'inactive'}" style="font-size:11px">${u.role||'subscriber'}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${(u.registered||'').split(' ')[0]||'—'}</td>
+      <td>
+        <button class="btn btn-danger btn-sm" onclick="deleteWPUser(${u.id},'${(u.username||'').replace(/'/g,"\\'")}')">🗑 حذف</button>
+      </td>
+    </tr>`).join('');
+}
+
+function filterUsers() {
+  const q = document.getElementById('user-search')?.value.toLowerCase() || '';
+  renderUsers(q ? _usersData.filter(u => (u.username||u.email||'').toLowerCase().includes(q)) : _usersData);
+}
+
+async function deleteWPUser(userId, username) {
+  if (!confirm(`حذف المستخدم "${username}" (ID: ${userId}) نهائياً؟`)) return;
+  const r = await agentPost('/wp/users/delete', {site: state.currentSite?.name, user_id: userId});
+  log(r.success ? `✅ تم حذف ${username}` : `❌ ${r.error||'فشل الحذف'}`);
+  fetchUsers();
+}
+
+async function testCurrentConnection() {
+  const el = document.getElementById('connection-test-result');
+  if (!state.currentSite) { el.textContent = 'اختر موقعاً أولاً'; el.style.color='var(--muted)'; return; }
+  el.textContent = '⏳ جارٍ الاختبار...'; el.style.color = 'var(--muted)';
+  const r = await agentPost('/wp/test-connection', {site: state.currentSite.name});
+  if (r.success && r.connected) {
+    el.innerHTML = `✅ متصل — زمن الاستجابة: <b>${r.latency_ms}ms</b> | Plugin: v${r.plugin_version} | WP: ${r.wp_version}`;
+    el.style.color = 'var(--green)';
+  } else {
+    el.innerHTML = `❌ ${r.error||'لا يوجد اتصال'}`;
+    el.style.color = 'var(--red)';
+  }
+}
+
+async function testNewSiteConnection() {
+  const rawUrl = document.getElementById('ns-url').value.trim();
+  const url = rawUrl.replace(/^\/+/, '').replace(/\/+$/, '');
+  const key = document.getElementById('ns-key').value.trim();
+  const el  = document.getElementById('add-site-result');
+  if (!url || !key) { el.innerHTML='<span style="color:var(--red)">أدخل URL و API Key</span>'; return; }
+  el.innerHTML = '⏳ جارٍ الاختبار...';
+  try {
+    const r = await agentPost('/wp/ping-url', {url, api_key: key});
+    if (r.success) {
+      el.innerHTML = `<span style="color:var(--green)">✅ متصل — ${r.plugin_version || 'Plugin OK'}</span>`;
+    } else {
+      el.innerHTML = `<span style="color:var(--red)">❌ ${r.error || 'فشل الاتصال'}</span>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<span style="color:var(--red)">❌ ${e.message}</span>`;
+  }
+}
+
+// ═══════════════════════════════════════
+//  MISC
+// ═══════════════════════════════════════
+function saveAgentURL() {
+  state.agentUrl = document.getElementById('agent-url-input').value.trim();
+  localStorage.setItem('aiwa_agent_url', state.agentUrl);
+  log('✅ Agent URL saved: ' + state.agentUrl);
+  loadSitesFromServer();
+  pollSystemStatus();
+}
+function log(msg) {
+  const el = document.getElementById('task-result') || document.getElementById('error-log-area');
+  if (el) el.innerHTML += `<span class="log-ok">[${new Date().toLocaleTimeString()}]</span> ${msg}\n`;
+}
+function logClear() {
+  const el = document.getElementById('task-result');
+  if (el) el.innerHTML = '';
+}
+function showModal(id) {
+  if (id === 'add-site-modal') {
+    showPage('settings');
+    document.querySelectorAll('.sidebar-menu a').forEach(a => a.classList.remove('active'));
+    document.querySelector('.sidebar-menu a[onclick*="settings"]')?.classList.add('active');
+    setTimeout(() => {
+      const el = document.getElementById('ns-name');
+      if (el) { el.focus(); el.scrollIntoView({behavior:'smooth', block:'center'}); }
+    }, 150);
+  }
+}
+</script>
+
+<script>
+// ══════════════════════════════════════════
+//  LIVE POLLING ENGINE
+// ══════════════════════════════════════════
+const POLL_INTERVAL = 5000;
+let _pollTimer = null;
+
+async function startLivePolling() {
+  if (_pollTimer) return;
+  _pollTimer = setInterval(pollSystemStatus, POLL_INTERVAL);
+  pollSystemStatus();
+}
+
+async function pollSystemStatus() {
+  try {
+    const r = await fetch(state.agentUrl + '/system/status');
+    if (!r.ok) { setGlobalStatus(false); return; }
+    const d = await r.json();
+    updateSystemPanel(d);
+    updateSitesFromAwareness(d.awareness);
+    updateToolsPanel(d.tools, d.tools_health);
+    updateFeedbackPanel(d.feedback, d.improvements);
+    updateLLMStatus(d.llm);
+  } catch(e) { setGlobalStatus(false); }
+}
+
+function updateSystemPanel(d) {
+  const aw = d.awareness || {};
+  setGlobalStatus(true);
+  const gs = document.getElementById('global-status');
+  if (gs) {
+    gs.className = 'pill connected';
+    gs.textContent = aw.current_task ? '⬤ Running: ' + aw.current_task.slice(0,25) : '⬤ Idle';
+  }
+  const s = id => document.getElementById(id);
+  // ov-status shows WP connection — only pollSystemStatus updates agent status elsewhere
+  if (s('sys-uptime')) s('sys-uptime').textContent = formatUptime(aw.uptime_seconds);
+  if (s('sys-tasks'))  s('sys-tasks').textContent  = aw.tasks_done || 0;
+  if (s('sys-rate'))   s('sys-rate').textContent   = (aw.tasks_done + aw.tasks_failed) > 0 ? (aw.success_rate || 0) + '%' : '—';
+}
+
+function updateSitesFromAwareness(awareness) {
+  if (!awareness || !awareness.sites) return;
+  awareness.sites.forEach(s => {
+    const ex = state.sites.find(x => x.name === s.name);
+    const isConn = s.connected === true || s.connection === 'connected';
+    if (ex) { ex.connected = isConn; }
+    else { state.sites.push({name: s.name, url: s.url, key: '', connected: isConn}); }
+  });
+  renderSitesList();
+  if (state.currentSite) {
+    const sd = awareness.sites.find(s => s.name === state.currentSite.name);
+    if (sd) {
+      const el = id => document.getElementById(id);
+      const isConn = sd.connected === true || sd.connection === 'connected';
+      if (el('ov-status'))    el('ov-status').textContent    = isConn ? '✅ متصل' : '❌ غير متصل';
+      if (el('ov-plugins'))   el('ov-plugins').textContent   = sd.plugins_active || '—';
+      if (el('site-latency')) el('site-latency').textContent = sd.latency_ms ? sd.latency_ms.toFixed(0) + 'ms' : '—';
+      const gs = document.getElementById('global-status');
+      if (gs) { gs.className = 'pill ' + (isConn ? 'connected' : 'disconnected'); }
+    }
+  }
+}
+
+function updateToolsPanel(tools, health) {
+  const panel = document.getElementById('tools-panel');
+  if (!panel || !tools) return;
+  const clr = {idle:'#10b981', busy:'#f59e0b', error:'#ef4444'};
+  panel.innerHTML = tools.map(t =>
+    `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--wp-border);font-size:11px;">
+       <span><strong>${t.name}</strong> <span style="color:var(--muted)">[${t.type}]</span> · ${t.call_count} calls</span>
+       <span style="color:${clr[t.status]||'#999'};font-weight:700">${t.status}</span>
+     </div>`
+  ).join('');
+  const hel = document.getElementById('tools-health');
+  if (hel && health) hel.textContent = `(${health.idle}/${health.total} idle${health.errors?' · '+health.errors+' err':''})`;
+}
+
+function updateFeedbackPanel(stats, improvements) {
+  if (!stats) return;
+  const s = id => document.getElementById(id);
+  const hasTasks = (stats.total || 0) > 0;
+  if (s('fb-total')) s('fb-total').textContent = stats.total || 0;
+  if (s('fb-rate'))  s('fb-rate').textContent  = hasTasks ? (stats.success_rate || 0) + '%' : '—';
+  if (s('fb-avg'))   s('fb-avg').textContent   = hasTasks ? (stats.avg_duration || 0).toFixed(1) + 's' : '—';
+  if (s('fb-tips'))  s('fb-tips').innerHTML    = (improvements || [])
+    .map(tip => `<div style="padding:3px 0;border-bottom:1px solid var(--wp-border);font-size:11px;">${tip}</div>`)
+    .join('') || '<span style="color:var(--green)">✅ النظام يعمل بشكل طبيعي</span>';
+}
+
+function updateLLMStatus(llm) {
+  if (!llm) return;
+  const s = id => document.getElementById(id);
+  if (s('llm-provider'))      s('llm-provider').textContent      = llm.provider || 'mock';
+  if (s('llm-model'))         s('llm-model').textContent         = llm.model    || '—';
+  if (s('llm-key'))           s('llm-key').textContent           = llm.has_key  ? '✅ Key set' : '❌ No key';
+  if (s('llm-provider-badge'))s('llm-provider-badge').textContent= llm.provider || '—';
+  if (s('llm-key-badge'))     s('llm-key-badge').textContent     = llm.has_key  ? '✅' : '❌';
+  const sel = s('llm-provider-sel');
+  if (sel && llm.provider) sel.value = llm.provider;
+}
+
+function setGlobalStatus(online) {
+  const el = document.getElementById('global-status');
+  if (!el || online) return;
+  el.className = 'pill disconnected';
+  el.textContent = '⬤ Agent Offline';
+}
+
+function formatUptime(sec) {
+  if (!sec) return '0s';
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  return h ? h+'h '+m+'m' : m ? m+'m '+s+'s' : s+'s';
+}
+
+async function saveLLMConfig() {
+  const r = await fetch(state.agentUrl + '/llm/configure', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      provider: document.getElementById('llm-provider-sel')?.value || 'mock',
+      api_key:  document.getElementById('llm-key-input')?.value   || '',
+      model:    document.getElementById('llm-model-input')?.value || '',
+      base_url: document.getElementById('llm-base-url')?.value    || '',
+    })
+  });
+  const d = await r.json();
+  log(d.success ? '✅ LLM: ' + d.config.provider + ' / ' + d.config.model : '❌ ' + d.error);
+  pollSystemStatus();
+}
+
+async function searchKnowledge() {
+  const q = document.getElementById('kb-search')?.value || '';
+  const r = await fetch(state.agentUrl + '/wp/knowledge/search', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query:q})
+  });
+  const d  = await r.json();
+  const el = document.getElementById('kb-results');
+  if (!el) return;
+  el.innerHTML = (d.results||[]).map(item =>
+    `<div style="padding:10px;border:1px solid var(--wp-border);border-radius:4px;margin-bottom:8px;">
+       <strong>${item.title||item.source}</strong>
+       <span style="font-size:10px;color:var(--muted);margin-right:6px">[${item.type}]</span>
+       <p style="font-size:12px;color:var(--muted);margin-top:4px">${item.snippet||''}</p>
+     </div>`
+  ).join('') || '<p style="color:var(--muted)">No results</p>';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(startLivePolling, 500);
+});
+</script>
+
+<!-- Edit Site Modal -->
+<div id="edit-site-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:6px;padding:24px;min-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <h3 style="font-size:15px;font-weight:600;margin-bottom:16px;color:#1d2327">✏️ تعديل الموقع</h3>
+    <input id="edit-site-name" type="hidden">
+    <div style="display:grid;gap:12px">
+      <div>
+        <label style="font-size:12px;color:#646970;display:block;margin-bottom:4px">URL الموقع</label>
+        <input id="edit-site-url" type="text" style="width:100%;padding:8px;border:1px solid #c3c4c7;border-radius:3px;font-size:13px" placeholder="https://example.com">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#646970;display:block;margin-bottom:4px">API Key (اتركه فارغاً للإبقاء على الحالي)</label>
+        <input id="edit-site-key" type="text" style="width:100%;padding:8px;border:1px solid #c3c4c7;border-radius:3px;font-size:13px" placeholder="اختياري">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('edit-site-modal').style.display='none'" style="padding:7px 16px;border:1px solid #c3c4c7;border-radius:3px;background:#fff;cursor:pointer;font-size:13px">إلغاء</button>
+        <button onclick="saveEditSite()" style="padding:7px 16px;border:none;border-radius:3px;background:#2271b1;color:#fff;cursor:pointer;font-size:13px;font-weight:500">💾 حفظ التعديلات</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

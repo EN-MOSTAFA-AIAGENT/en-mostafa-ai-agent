@@ -5,7 +5,7 @@ MOSTAFA AI AGENT v4.0 - EASY MODE 🚀
 ✅ Live Dashboard Support
 """
 
-from flask import Flask, request, jsonify, send_from_directory, Response, render_template_string
+from flask import Flask, request, jsonify, send_from_directory, Response, render_template
 import os
 import logging
 import subprocess
@@ -20,14 +20,16 @@ import json
 import asyncio
 from datetime import datetime
 from playwright.sync_api import sync_playwright, Browser, Page, BrowserContext, Playwright
-import websockets
+from job_manager import CommandParser, CommandType
 
 SCREENSHOTS_DIR = os.path.join(os.path.dirname(__file__), "screenshots")
 BACKUP_DIR = os.path.join(os.path.expanduser("~"), "Desktop", "Agent_Backups")
 os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
-PUBLIC_URL_BASE = "https://api.devmostafa.com"
+REST_HOST = os.environ.get("REST_HOST", "0.0.0.0")
+REST_PORT = int(os.environ.get("REST_PORT", "5001"))
+PUBLIC_URL_BASE = os.environ.get("PUBLIC_URL_BASE", f"http://127.0.0.1:{REST_PORT}").rstrip("/")
 
 # ==================== PLAYWRIGHT ====================
 # المتغيرات العامة للـ browser (عالمية)
@@ -48,7 +50,10 @@ _browser_snapshot = {
     "status": "stopped",  # stopped, running, idle
     "screenshot": None,
     "last_action": None,
-    "last_update": None
+    "last_update": None,
+    "logs": [],
+    "command_status": None,
+    "progress": 0
 }
 _dashboard_snapshot_lock = threading.Lock()
 
@@ -58,6 +63,55 @@ def broadcast_dashboard_update():
         snapshot = _browser_snapshot.copy()
     if socketio:
         socketio.emit("dashboard_update", snapshot, namespace="/dashboard")
+
+
+def append_dashboard_log(message: str, level: str = "info"):
+    entry = {
+        "time": datetime.now().strftime("%H:%M:%S"),
+        "level": level,
+        "message": message
+    }
+    with _dashboard_snapshot_lock:
+        logs = list(_browser_snapshot.get("logs", []))
+        logs.append(entry)
+        _browser_snapshot["logs"] = logs[-100:]
+        _browser_snapshot["last_update"] = datetime.now().isoformat()
+
+
+def update_dashboard_snapshot(
+    *,
+    page=None,
+    action: str = None,
+    screenshot: str = None,
+    status: str = None,
+    command_status: str = None,
+    progress: int = None,
+    broadcast: bool = True
+):
+    with _dashboard_snapshot_lock:
+        if page is not None:
+            try:
+                _browser_snapshot["url"] = page.url or ""
+            except Exception:
+                pass
+            try:
+                _browser_snapshot["title"] = page.title() or ""
+            except Exception:
+                pass
+        if action is not None:
+            _browser_snapshot["last_action"] = action
+        if screenshot is not None:
+            _browser_snapshot["screenshot"] = screenshot
+        if status is not None:
+            _browser_snapshot["status"] = status
+        if command_status is not None:
+            _browser_snapshot["command_status"] = command_status
+        if progress is not None:
+            _browser_snapshot["progress"] = progress
+        _browser_snapshot["last_update"] = datetime.now().isoformat()
+
+    if broadcast:
+        broadcast_dashboard_update()
 
 # ==================== DASHBOARD HTML ====================
 DASHBOARD_HTML = """
@@ -92,6 +146,10 @@ DASHBOARD_HTML = """
         .btn-stop { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
         .btn-refresh { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
         .btn-refresh:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(59,130,246,0.4); }
+        .command-box { margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .command-input { flex: 1; min-width: 180px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.25); color: #fff; }
+        .quick-actions { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn-quick { background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.12); }
         .info-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .info-item:last-child { border-bottom: none; }
         .info-label { color: #888; }
@@ -131,6 +189,16 @@ DASHBOARD_HTML = """
                     <button id="btn-stop" class="btn btn-stop" onclick="stopAgent()">⏹️ Stop Agent</button>
                     <button id="btn-refresh" class="btn btn-refresh" onclick="refreshScreenshot()">🔄 Refresh</button>
                 </div>
+                <div class="command-box">
+                    <input id="command-input" class="command-input" type="text" placeholder="اكتب أمرًا للوكيل أو رابطًا..." onkeydown="handleCommandKey(event)">
+                    <button class="btn btn-refresh" onclick="sendCommand()">Send</button>
+                </div>
+                <div class="quick-actions">
+                    <button class="btn btn-quick" onclick="sendQuickCommand('reload')">Reload</button>
+                    <button class="btn btn-quick" onclick="sendQuickCommand('back')">Back</button>
+                    <button class="btn btn-quick" onclick="sendQuickCommand('لقطة شاشة')">Screenshot</button>
+                    <button class="btn btn-quick" onclick="sendQuickCommand('scroll down')">Scroll Down</button>
+                </div>
             </div>
 
             <div class="card">
@@ -154,6 +222,14 @@ DASHBOARD_HTML = """
                 <div class="info-item">
                     <span class="info-label">Last Update:</span>
                     <span id="info-update" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Command Status:</span>
+                    <span id="info-command" class="info-value">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Progress:</span>
+                    <span id="info-progress" class="info-value">0%</span>
                 </div>
             </div>
 
@@ -219,13 +295,16 @@ DASHBOARD_HTML = """
                 statusBadge.classList.add('status-running');
                 statusOverlay.classList.add('status-running');
                 document.getElementById('live-indicator').style.display = 'inline-block';
+                startAutoRefresh();
             } else if (data.status === 'idle') {
                 statusBadge.classList.add('status-idle');
                 statusOverlay.classList.add('status-idle');
+                stopAutoRefresh();
             } else {
                 statusBadge.classList.add('status-stopped');
                 statusOverlay.classList.add('status-stopped');
                 document.getElementById('live-indicator').style.display = 'none';
+                stopAutoRefresh();
             }
 
             // Update info panel
@@ -234,12 +313,17 @@ DASHBOARD_HTML = """
             document.getElementById('info-title').textContent = data.title || '-';
             document.getElementById('info-action').textContent = data.last_action || '-';
             document.getElementById('info-update').textContent = data.last_update || '-';
+            document.getElementById('info-command').textContent = data.command_status || '-';
+            document.getElementById('info-progress').textContent = (data.progress ?? 0) + '%';
 
             // Update screenshot
             if (data.screenshot && data.screenshot !== lastScreenshot) {
                 lastScreenshot = data.screenshot;
                 document.getElementById('screen').src = data.screenshot;
-                addLog('New screenshot received', 'info');
+            }
+
+            if (Array.isArray(data.logs)) {
+                renderLogs(data.logs);
             }
         }
 
@@ -303,13 +387,111 @@ DASHBOARD_HTML = """
             logPanel.scrollTop = logPanel.scrollHeight;
         }
 
+        function renderLogs(logs) {
+            const logPanel = document.getElementById('log-panel');
+            logPanel.innerHTML = '';
+            logs.forEach((entry) => {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry';
+                logEntry.innerHTML = `<span class="log-time">[${entry.time}]</span> <span class="log-${entry.level || 'info'}">${entry.message}</span>`;
+                logPanel.appendChild(logEntry);
+            });
+            logPanel.scrollTop = logPanel.scrollHeight;
+        }
+
+        async function sendCommand() {
+            const input = document.getElementById('command-input');
+            const command = input.value.trim();
+            if (!command) return;
+
+            try {
+                addLog('Sending command: ' + command, 'info');
+                const response = await fetch('/agent/command', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({command})
+                });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    input.value = '';
+                    addLog('Command executed: ' + result.action, 'success');
+                } else {
+                    addLog('Command failed: ' + (result.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                addLog('Command error: ' + error.message, 'error');
+            }
+        }
+
+        function sendQuickCommand(command) {
+            document.getElementById('command-input').value = command;
+            sendCommand();
+        }
+
+        function handleCommandKey(event) {
+            if (event.key === 'Enter') {
+                sendCommand();
+            }
+        }
+
+        function renderLogs(logs) {
+            const logPanel = document.getElementById('log-panel');
+            logPanel.innerHTML = '';
+            logs.forEach((entry) => {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry';
+                logEntry.innerHTML = `<span class="log-time">[${entry.time}]</span> <span class="log-${entry.level || 'info'}">${entry.message}</span>`;
+                logPanel.appendChild(logEntry);
+            });
+            logPanel.scrollTop = logPanel.scrollHeight;
+        }
+
+        async function sendCommand() {
+            const input = document.getElementById('command-input');
+            const command = input.value.trim();
+            if (!command) return;
+
+            try {
+                addLog('Sending command: ' + command, 'info');
+                const response = await fetch('/agent/command', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({command})
+                });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    input.value = '';
+                    addLog('Command executed: ' + result.action, 'success');
+                } else {
+                    addLog('Command failed: ' + (result.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                addLog('Command error: ' + error.message, 'error');
+            }
+        }
+
+        function sendQuickCommand(command) {
+            document.getElementById('command-input').value = command;
+            sendCommand();
+        }
+
+        function handleCommandKey(event) {
+            if (event.key === 'Enter') {
+                sendCommand();
+            }
+        }
+
         // Auto-refresh screenshot every 3 seconds when running
         function startAutoRefresh() {
+            if (updateInterval) return;
             updateInterval = setInterval(refreshScreenshot, 3000);
         }
 
         function stopAutoRefresh() {
-            clearInterval(updateInterval);
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
         }
 
         // Initialize
@@ -325,7 +507,7 @@ DASHBOARD_WS_HTML = """
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
-    <title>Mostafa AI - WebSocket Live Stream</title>
+    <title>Mostafa AI - Live Stream</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0f0f1a; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
@@ -334,7 +516,7 @@ DASHBOARD_WS_HTML = """
         .status.connected { color: #22c55e; }
         .status.disconnected { color: #ef4444; }
         .video-container { width: 100%; max-width: 1200px; margin: 20px auto; background: #000; border-radius: 10px; overflow: hidden; }
-        video { width: 100%; display: block; }
+        .stream-image { width: 100%; display: block; min-height: 300px; object-fit: contain; }
         .controls { margin: 20px 0; }
         button { padding: 15px 30px; font-size: 1.1em; margin: 5px; cursor: pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; border-radius: 8px; transition: transform 0.2s; }
         button:hover { transform: scale(1.05); }
@@ -350,7 +532,7 @@ DASHBOARD_WS_HTML = """
         <h1>🎥 Mostafa AI - Live Stream</h1>
         <div id="status" class="status disconnected">Disconnected</div>
         <div class="video-container">
-            <video id="video" autoplay playsinline muted></video>
+            <img id="stream-image" class="stream-image" alt="Live stream frame">
         </div>
         <div class="controls">
             <button id="btn-start" onclick="startStream()">Start Stream</button>
@@ -360,12 +542,13 @@ DASHBOARD_WS_HTML = """
     </div>
 
     <script>
-        const video = document.getElementById('video');
+        const streamImage = document.getElementById('stream-image');
         const status = document.getElementById('status');
         const btnStart = document.getElementById('btn-start');
         const btnStop = document.getElementById('btn-stop');
         const log = document.getElementById('log');
-        let ws;
+        let stream;
+        let lastFrame = '';
 
         function addLog(msg, type) {
             const entry = document.createElement('div');
@@ -377,36 +560,39 @@ DASHBOARD_WS_HTML = """
 
         function startStream() {
             try {
-                addLog('Connecting to WebSocket...', 'info');
-                ws = new WebSocket('ws://' + window.location.host + '/ws/stream');
+                addLog('Connecting to stream events...', 'info');
+                stream = new EventSource('/stream/events');
 
-                ws.onopen = function() {
+                stream.onopen = function() {
                     status.className = 'status connected';
                     status.textContent = 'Connected';
                     btnStart.disabled = true;
                     btnStop.disabled = false;
-                    addLog('WebSocket connected successfully!', 'success');
+                    addLog('Live stream connected successfully!', 'success');
                 };
 
-                ws.onclose = function() {
+                stream.onmessage = function(e) {
+                    const data = JSON.parse(e.data);
+                    if (data.base64) {
+                        const src = 'data:image/png;base64,' + data.base64;
+                        if (src !== lastFrame) {
+                            streamImage.src = src;
+                            lastFrame = src;
+                            addLog('New frame received', 'info');
+                        }
+                    }
+                };
+
+                stream.onerror = function() {
                     status.className = 'status disconnected';
                     status.textContent = 'Disconnected';
                     btnStart.disabled = false;
                     btnStop.disabled = true;
-                    addLog('WebSocket disconnected', 'error');
-                };
-
-                ws.onerror = function(e) {
-                    addLog('WebSocket error: ' + e.message, 'error');
-                };
-
-                ws.onmessage = function(e) {
-                    const data = JSON.parse(e.data);
-                    if (data.type === 'screenshot') {
-                        const src = 'data:image/png;base64,' + data.base64;
-                        video.src = src;
-                        addLog('New frame received', 'info');
+                    if (stream) {
+                        stream.close();
+                        stream = null;
                     }
+                    addLog('Live stream disconnected', 'error');
                 };
 
             } catch (error) {
@@ -415,8 +601,14 @@ DASHBOARD_WS_HTML = """
         }
 
         function stopStream() {
-            if (ws) {
-                ws.close();
+            if (stream) {
+                stream.close();
+                stream = null;
+                status.className = 'status disconnected';
+                status.textContent = 'Disconnected';
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+                addLog('Stream stopped by user', 'info');
             }
         }
     </script>
@@ -427,8 +619,7 @@ DASHBOARD_WS_HTML = """
 # WebSocket handlers
 def handle_websocket(websocket, path):
     """WebSocket handler للـ Live Stream"""
-    with _dashboard_snapshot_lock:
-        _dashboard_active = True
+    return None
 
     try:
         # Send initial snapshot
@@ -485,6 +676,61 @@ def get_browser_context():
 
     return _playwright_pw, _playwright_browser, _playwright_context
 
+
+def capture_live_frame(page=None, full_page: bool = False):
+    page = page or _playwright_page
+    if page is None:
+        return None
+    img = page.screenshot(type="png", full_page=full_page)
+    return f"data:image/png;base64,{base64.b64encode(img).decode('utf-8')}"
+
+
+def execute_dashboard_command(page, command):
+    if not page:
+        raise RuntimeError("No browser active")
+
+    parsed = CommandParser.parse(command) if command else None
+    if not parsed and command and command.strip().startswith(("http://", "https://")):
+        page.goto(command.strip(), wait_until="domcontentloaded", timeout=30000)
+        return "goto"
+    if not parsed:
+        raise RuntimeError("Unsupported command")
+
+    if parsed.type == CommandType.GOTO:
+        target_url = parsed.params.get("url")
+        if not target_url:
+            raise RuntimeError("Missing target URL")
+        page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
+        return "goto"
+
+    if parsed.type == CommandType.BACK:
+        page.go_back()
+        return "back"
+
+    if parsed.type == CommandType.RELOAD:
+        page.reload(wait_until="domcontentloaded")
+        return "reload"
+
+    if parsed.type == CommandType.WAIT_LOAD:
+        page.wait_for_load_state("networkidle", timeout=30000)
+        return "wait_load"
+
+    if parsed.type == CommandType.SCREENSHOT:
+        return "screenshot"
+
+    if parsed.type == CommandType.SCROLL:
+        pages = max(1, int(parsed.params.get("pages", 1)))
+        direction = parsed.params.get("direction", "down")
+        multiplier = 1 if direction == "down" else -1
+        page.evaluate(
+            "(distance) => window.scrollBy({ top: distance, behavior: 'smooth' })",
+            page.viewport_size["height"] * pages * multiplier if page.viewport_size else 800 * pages * multiplier
+        )
+        page.wait_for_timeout(600)
+        return f"scroll_{direction}"
+
+    raise RuntimeError(f"Unsupported command type: {parsed.type.value}")
+
 # ==================== CONFIG ====================
 READONLY_MODE = os.environ.get("READONLY_MODE", "false").lower() == "true"
 app = Flask(__name__)
@@ -495,7 +741,7 @@ def init_socketio():
     global socketio
     from flask_socketio import SocketIO
     # Use eventlet for async support to fix Python 3.11 compatibility
-    socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet')
+    socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 def register_socketio_handlers():
     @socketio.on("connect", namespace="/dashboard")
     def dash_connect():
@@ -518,6 +764,48 @@ agent_status = {
     "started_at": None
 }
 agent_status_lock = threading.RLock()
+
+
+def resolve_screenshot_base64(screenshot_ref):
+    """Resolve a screenshot reference to raw base64 for live streaming."""
+    if not screenshot_ref:
+        return None
+
+    if isinstance(screenshot_ref, str) and screenshot_ref.startswith("data:"):
+        parts = screenshot_ref.split(",", 1)
+        return parts[1] if len(parts) == 2 else None
+
+    local_path = None
+    if isinstance(screenshot_ref, str):
+        public_prefix = f"{PUBLIC_URL_BASE}/screenshots/"
+        if screenshot_ref.startswith(public_prefix):
+            filename = screenshot_ref[len(public_prefix):]
+            local_path = os.path.join(SCREENSHOTS_DIR, filename)
+        elif os.path.isabs(screenshot_ref):
+            local_path = screenshot_ref
+        else:
+            local_path = os.path.join(SCREENSHOTS_DIR, screenshot_ref)
+
+    if not local_path or not os.path.exists(local_path):
+        return None
+
+    with open(local_path, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
+
+
+def build_stream_snapshot():
+    with _dashboard_snapshot_lock:
+        snapshot = _browser_snapshot.copy()
+
+    return {
+        "type": "snapshot",
+        "url": snapshot.get("url", ""),
+        "title": snapshot.get("title", ""),
+        "status": snapshot.get("status", "stopped"),
+        "last_action": snapshot.get("last_action"),
+        "last_update": snapshot.get("last_update"),
+        "base64": resolve_screenshot_base64(snapshot.get("screenshot")),
+    }
 
 # ==================== BASIC ROUTES (Diagnostics) ====================
 
@@ -554,6 +842,13 @@ def save_screenshot():
     with agent_status_lock:
         agent_status["last_screenshot"] = f"{PUBLIC_URL_BASE}/screenshots/{filename}"
         agent_status["last_action"] = "screenshot_taken"
+
+    update_dashboard_snapshot(
+        action="screenshot_saved",
+        screenshot=f"{PUBLIC_URL_BASE}/screenshots/{filename}",
+        status="running" if agent_status.get("running") else "idle"
+    )
+    append_dashboard_log("Screenshot saved from external source", "success")
 
     return jsonify({
         "success": True,
@@ -599,15 +894,13 @@ def agent_screenshot():
             agent_status["last_screenshot"] = url
             agent_status["last_action"] = "screenshot"
 
-        # Update dashboard snapshot
-        with _dashboard_snapshot_lock:
-            _browser_snapshot["screenshot"] = url
-            _browser_snapshot["url"] = _playwright_page.url if _playwright_page else ""
-            _browser_snapshot["title"] = _playwright_page.title() if _playwright_page else ""
-            _browser_snapshot["last_action"] = "screenshot"
-            _browser_snapshot["last_update"] = datetime.now().isoformat()
-
-        broadcast_dashboard_update()
+        update_dashboard_snapshot(
+            page=_playwright_page,
+            action="screenshot",
+            screenshot=f"data:image/png;base64,{b64}",
+            status="running" if agent_status.get("running") else "idle"
+        )
+        append_dashboard_log("Live screenshot captured", "success")
 
         return jsonify({
             "success": True,
@@ -621,6 +914,14 @@ def agent_screenshot():
 @app.route('/agent/running', methods=['GET', 'POST'])
 def set_agent_running():
     """تعيين حالة الـ Agent (يعمل أو متوقف)"""
+    if request.method == 'GET':
+        with agent_status_lock:
+            return jsonify({
+                "success": True,
+                "running": agent_status["running"],
+                "status": agent_status.copy()
+            })
+
     if request.method == 'POST':
         data = request.json or {}
         running = data.get('running', False)
@@ -645,8 +946,86 @@ def set_agent_running():
             _browser_snapshot["last_action"] = "agent_state_change"
             _browser_snapshot["last_update"] = datetime.now().isoformat()
 
+        append_dashboard_log(
+            "Agent started" if running else "Agent stopped",
+            "success" if running else "error"
+        )
         broadcast_dashboard_update()
         return jsonify({"success": True, "running": agent_status["running"]})
+
+
+@app.route('/agent/dashboard/update', methods=['POST'])
+def update_agent_dashboard():
+    """Receive live dashboard updates from external agent processes."""
+    data = request.json or {}
+    screenshot_base64 = data.get("screenshot_base64")
+    screenshot = f"data:image/png;base64,{screenshot_base64}" if screenshot_base64 else None
+
+    with _dashboard_snapshot_lock:
+        if data.get("url") is not None:
+            _browser_snapshot["url"] = data.get("url") or ""
+        if data.get("title") is not None:
+            _browser_snapshot["title"] = data.get("title") or ""
+        if data.get("last_action") is not None:
+            _browser_snapshot["last_action"] = data.get("last_action")
+        if data.get("status") is not None:
+            _browser_snapshot["status"] = data.get("status")
+        if data.get("command_status") is not None:
+            _browser_snapshot["command_status"] = data.get("command_status")
+        if data.get("progress") is not None:
+            _browser_snapshot["progress"] = data.get("progress")
+        if screenshot is not None:
+            _browser_snapshot["screenshot"] = screenshot
+        _browser_snapshot["last_update"] = datetime.now().isoformat()
+
+    message = data.get("log_message")
+    if message:
+        append_dashboard_log(message, data.get("log_level", "info"))
+    broadcast_dashboard_update()
+    return jsonify({"success": True})
+
+
+@app.route('/agent/command', methods=['POST'])
+def agent_command():
+    """Execute dashboard command against the shared browser session."""
+    global _playwright_page
+    data = request.json or {}
+    command = (data.get("command") or "").strip()
+    if not command:
+        return jsonify({"error": "command required"}), 400
+
+    with _playwright_lock:
+        if _playwright_page is None:
+            get_browser_context()
+        page = _playwright_page
+
+    try:
+        action_name = execute_dashboard_command(page, command)
+        live_frame = capture_live_frame(page)
+        update_dashboard_snapshot(
+            page=page,
+            action=action_name,
+            screenshot=live_frame,
+            status="running",
+            command_status=f"Executed: {command}"
+        )
+        append_dashboard_log(f"Dashboard command executed: {command}", "success")
+        return jsonify({
+            "success": True,
+            "action": action_name,
+            "url": page.url,
+            "title": page.title() if page else "",
+            "screenshot": live_frame
+        })
+    except Exception as e:
+        append_dashboard_log(f"Dashboard command failed: {command} ({e})", "error")
+        update_dashboard_snapshot(
+            page=page,
+            action="command_failed",
+            status="idle",
+            command_status=f"Failed: {command}"
+        )
+        return jsonify({"error": str(e)}), 500
 
 # ==================== INFERENCE ====================
 def infer_extension_from_content(content) -> str:
@@ -690,6 +1069,131 @@ def get_capabilities():
         },
         "protection": "minimal"
     })
+
+# ==================== FILE API (no restrictions, auto-fix permissions) ====================
+
+def _grant_permissions(path: str):
+    """icacls: grant Everyone full access"""
+    import subprocess
+    target = path if os.path.exists(path) else os.path.dirname(path)
+    try:
+        subprocess.run(
+            ["icacls", target, "/grant", "Everyone:(F)", "/T", "/C", "/Q"],
+            capture_output=True, timeout=15
+        )
+    except Exception:
+        pass
+
+def _read_file_direct(path: str) -> str:
+    for enc in ["utf-8", "cp1256", "cp1252", "latin-1"]:
+        try:
+            with open(path, "r", encoding=enc, errors="replace") as f:
+                return f.read(200000)
+        except UnicodeDecodeError:
+            continue
+    return None
+
+@app.route('/read-file', methods=['GET', 'POST'])
+def read_file_api():
+    """Read any file — GET ?path=C:\\file.py  or  POST {path}"""
+    path = (request.args.get('path') or (request.json or {}).get('path', '')) if request.method in ('GET','POST') else ''
+    if not path:
+        return jsonify({"error": "path required"}), 400
+    if not os.path.exists(path):
+        return jsonify({"error": f"File not found: {path}"}), 404
+    try:
+        content = _read_file_direct(path)
+        if content is None:
+            return jsonify({"error": "Binary file"}), 400
+        return content, 200, {"Content-Type": "text/plain; charset=utf-8"}
+    except PermissionError:
+        _grant_permissions(path)
+        try:
+            content = _read_file_direct(path)
+            return content or "", 200, {"Content-Type": "text/plain; charset=utf-8"}
+        except Exception as e:
+            return jsonify({"error": f"Permission denied even after fix: {e}"}), 403
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/write-file', methods=['POST'])
+def write_file_api():
+    """Write/overwrite any file — POST {path, content}"""
+    data = request.json or {}
+    path = data.get('path', '')
+    content = data.get('content', '')
+    if not path:
+        return jsonify({"error": "path required"}), 400
+    def _write():
+        os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(content)
+    try:
+        _write()
+        return jsonify({"success": True, "path": path, "bytes": len(content)})
+    except PermissionError:
+        _grant_permissions(path)
+        try:
+            _write()
+            return jsonify({"success": True, "path": path, "bytes": len(content), "note": "permissions auto-fixed"})
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 403
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/list-dir', methods=['GET', 'POST'])
+def list_dir_api():
+    """List directory contents — GET ?path=C:\\mcp-agent"""
+    path = request.args.get('path') or (request.json or {}).get('path', 'C:\\mcp-agent')
+    try:
+        entries = []
+        for e in os.listdir(path):
+            full = os.path.join(path, e)
+            try:
+                size = os.path.getsize(full) if os.path.isfile(full) else 0
+            except Exception:
+                size = 0
+            entries.append({"name": e, "type": "dir" if os.path.isdir(full) else "file", "size": size})
+        return jsonify({"path": path, "entries": entries, "count": len(entries)})
+    except PermissionError:
+        _grant_permissions(path)
+        try:
+            entries = [{"name": e, "type": "dir" if os.path.isdir(os.path.join(path, e)) else "file"} for e in os.listdir(path)]
+            return jsonify({"path": path, "entries": entries, "count": len(entries)})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 403
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/exec', methods=['POST'])
+def exec_api():
+    """Execute any shell command — POST {cmd, timeout?}
+    Returns stdout, stderr, returncode"""
+    import subprocess
+    data = request.json or {}
+    cmd = data.get('cmd') or data.get('command', '')
+    timeout = int(data.get('timeout', 30))
+    if not cmd:
+        return jsonify({"error": "cmd required"}), 400
+    try:
+        r = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True,
+            timeout=timeout, encoding='utf-8', errors='replace'
+        )
+        return jsonify({"stdout": r.stdout, "stderr": r.stderr, "returncode": r.returncode, "success": r.returncode == 0})
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": f"Timeout after {timeout}s", "success": False}), 408
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 500
+
+@app.route('/fix-permissions', methods=['POST', 'GET'])
+def fix_permissions_api():
+    """Grant Everyone full access to a path — POST {path} or GET ?path=..."""
+    path = request.args.get('path') or (request.json or {}).get('path', '')
+    if not path:
+        return jsonify({"error": "path required"}), 400
+    _grant_permissions(path)
+    return jsonify({"success": True, "path": path, "action": "icacls /grant Everyone:(F) /T /C"})
 
 # ==================== UNIFIED ENDPOINT ====================
 @app.route('/mcp/safe', methods=['POST'])
@@ -845,7 +1349,7 @@ def mcp_power():
         elif action == "batch_mkdir_and_copy":
             source_pattern = data.get('source_pattern')
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            dest_base = os.path.join(BACKUP_DIR, f"copy_{timestamp}")
+            dest_base = data.get("dest_base") or os.path.join(BACKUP_DIR, f"copy_{timestamp}")
             if not source_pattern:
                 return jsonify({"error": "source_pattern required"}), 400
             for forbidden in ["C:\\Windows", "C:\\Program Files", "C:\\Program Files (x86)"]:
@@ -1062,39 +1566,29 @@ def playwright_action():
 @app.route('/ws/stream', methods=['GET'])
 def stream_websocket():
     """WebSocket endpoint للـ Live Stream"""
-    from flask import Response, request
-    from websockets.server import WebSocketServerProtocol
-    import threading
-    import base64
+    return jsonify({
+        "error": "This endpoint is not a WebSocket endpoint.",
+        "stream_endpoint": "/stream/events"
+    }), 410
 
+@app.route('/stream/events', methods=['GET'])
+def stream_events():
+    """SSE endpoint for the live stream page."""
     def event_stream():
+        global _dashboard_active
+        _dashboard_active = True
         try:
-            websocket = WebSocketServerProtocol(path=request.environ.get('PATH_INFO', ''), host=None, port=None, )
-
-            with _dashboard_snapshot_lock:
-                _dashboard_active = True
-
-            # Send initial frame
-            with _dashboard_snapshot_lock:
-                if _browser_snapshot.get("screenshot"):
-                    import base64
-                    if _browser_snapshot["screenshot"].startswith("data:"):
-                        img_data = _browser_snapshot["screenshot"].split(",")[1]
-                    else:
-                        img_data = base64.b64encode(open(_browser_snapshot["screenshot"], "rb").read()).decode()
-                    yield f"data: {json.dumps({'type': 'screenshot', 'base64': img_data})}\n\n"
-
-            # Send updates every 1 second
+            last_payload = None
             while True:
+                payload = build_stream_snapshot()
+                serialized = json.dumps(payload)
+                if serialized != last_payload:
+                    yield f"data: {serialized}\n\n"
+                    last_payload = serialized
                 time.sleep(1)
-                with _dashboard_snapshot_lock:
-                    if _browser_snapshot.get("screenshot"):
-                        if _browser_snapshot["screenshot"].startswith("data:"):
-                            img_data = _browser_snapshot["screenshot"].split(",")[1]
-                        else:
-                            img_data = base64.b64encode(open(_browser_snapshot["screenshot"], "rb").read()).decode()
-                        yield f"data: {json.dumps({'type': 'screenshot', 'base64': img_data})}\n\n"
         except GeneratorExit:
+            _dashboard_active = False
+        finally:
             _dashboard_active = False
 
     return Response(event_stream(), mimetype="text/event-stream")
@@ -1102,12 +1596,12 @@ def stream_websocket():
 @app.route('/dashboard', methods=['GET'])
 def dashboard():
     """Return the Live Dashboard HTML"""
-    return render_template_string(DASHBOARD_HTML)
+    return render_template("dashboard.html")
 
 @app.route('/stream', methods=['GET'])
 def stream_page():
     """Return the Live Stream HTML"""
-    return render_template_string(DASHBOARD_WS_HTML)
+    return render_template("stream.html")
 
 @app.route('/api/dashboard/status', methods=['GET'])
 def get_dashboard_status():
@@ -1118,16 +1612,212 @@ def get_dashboard_status():
             "snapshot": _browser_snapshot.copy()
         })
 
+
+
+# ======================================================
+#  WordPress Integration Layer
+# ======================================================
+try:
+    from wp_routes        import wp_bp
+    from system_awareness import system_awareness
+    from feedback_loop    import feedback_loop
+    from knowledge_manager import knowledge_manager
+    from llm_bridge       import llm_bridge
+    from tool_registry    import tool_registry, ToolType
+    from agent_core       import AgentCore as _AgentCore
+    from wp_manager       import wp_manager as _wp_manager
+
+    app.register_blueprint(wp_bp)
+
+    _shared_agent = None
+
+    def _get_agent():
+        global _shared_agent
+        if _shared_agent is None:
+            _shared_agent = _AgentCore()
+            tool_registry.register("memory_engine",   ToolType.MEMORY,    _shared_agent.memory,    "Execution memory",    1)
+            tool_registry.register("pattern_engine",  ToolType.ANALYSIS,  _shared_agent.pattern,   "Error patterns",      2)
+            tool_registry.register("strategy_engine", ToolType.ANALYSIS,  _shared_agent.strategy,  "Strategy engine",     2)
+            tool_registry.register("system_executor", ToolType.EXECUTION, _shared_agent.executor,  "Shell execution",     3)
+            tool_registry.register("knowledge_mgr",   ToolType.KNOWLEDGE, knowledge_manager,        "Knowledge base",      1)
+            tool_registry.register("llm_bridge",      ToolType.LLM,       llm_bridge,               "LLM interface",       1)
+            tool_registry.register("wp_manager",      ToolType.WP,        _wp_manager,              "WP multi-site",       1)
+            feedback_loop.on_result(
+                lambda r: logger.info("[FB] " + ("OK" if r["success"] else "FAIL") + " " + r["task"][:40])
+            )
+        return _shared_agent
+
+    _get_agent()
+    system_awareness.start_heartbeat(_wp_manager, interval=60)
+    _wp_manager.start_heartbeat(interval=60)
+    logger.info("WordPress Integration Layer loaded OK")
+
+except Exception as _wp_init_err:
+    import logging as _log
+    _log.getLogger("server").warning(f"WordPress layer optional: {_wp_init_err}")
+
+
+@app.route("/run", methods=["POST"])
+def run_task():
+    import time as _t
+    data      = request.get_json(force=True) or {}
+    task      = data.get("task", "")
+    site      = data.get("site")
+    all_sites = data.get("all_sites", False)
+    explain   = data.get("explain", False)
+    if not task:
+        return jsonify({"error": "task required"}), 400
+    try:
+        agent = _get_agent()
+        system_awareness.begin_task(task, tool="agent_core", site=site)
+        t0 = _t.time()
+        if all_sites:
+            result = agent.execute_on_all_sites(task)
+        elif site:
+            result = agent.execute_wordpress_task(site, task)
+        else:
+            result = agent.handle_task(task, explain=explain)
+        dur    = _t.time() - t0
+        r_dict = result if isinstance(result, dict) else {"result": result, "status": "completed"}
+        r_dict.setdefault("success", True)
+        r_dict.setdefault("status", "completed")
+        system_awareness.end_task(success=True)
+        feedback_loop.record(
+            task=task, result=r_dict, tool="agent_core",
+            site=site or "", duration=dur,
+            memory_engine=agent.memory,
+            strategy_engine=agent.strategy
+        )
+        return jsonify(r_dict)
+    except Exception as e:
+        system_awareness.end_task(success=False)
+        return jsonify({"error": str(e), "status": "failed"}), 500
+
+
+@app.route("/knowledge/upload", methods=["POST"])
+def knowledge_upload():
+    import tempfile as _tmp
+    f    = request.files.get("file")
+    tags = request.form.get("tags", "").split(",")
+    if not f:
+        return jsonify({"success": False, "reason": "no file"}), 400
+    ext  = os.path.splitext(f.filename)[1]
+    tmp  = _tmp.mktemp(suffix=ext)
+    f.save(tmp)
+    res  = knowledge_manager.learn_from_file(tmp, tags=[t.strip() for t in tags if t.strip()])
+    try:
+        os.remove(tmp)
+    except Exception:
+        pass
+    return jsonify(res)
+
+
+@app.route("/system/status", methods=["GET"])
+def system_full_status():
+    return jsonify({
+        "awareness":    system_awareness.get_snapshot(),
+        "tools":        tool_registry.get_all_status(),
+        "tools_health": tool_registry.health_check(),
+        "feedback":     feedback_loop.get_stats(),
+        "knowledge":    knowledge_manager.get_stats(),
+        "llm":          llm_bridge.get_config(),
+        "improvements": feedback_loop.suggest_improvements(),
+    })
+
+
+@app.route("/llm/configure", methods=["POST"])
+def configure_llm():
+    data = request.get_json(force=True) or {}
+    llm_bridge.configure(
+        provider=data.get("provider", "mock"),
+        api_key=data.get("api_key", ""),
+        model=data.get("model", ""),
+        base_url=data.get("base_url", ""),
+    )
+    return jsonify({"success": True, "config": llm_bridge.get_config()})
+
+
+@app.route("/wp-dashboard", methods=["GET"])
+def wp_dashboard_page():
+    html_path = os.path.join(os.path.dirname(__file__), "templates", "wp-dashboard.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as fh:
+            content = fh.read()
+        headers = {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+        return content, 200, headers
+    return "WordPress Dashboard not found", 404
+
+
+
+# ══════════════════════════════════════════════
+#  Startup: Restore Sites + Health Monitor
+# ══════════════════════════════════════════════
+
+try:
+    from sites_store   import sites_store, restore_sites_to_manager
+    from health_monitor import health_monitor
+    from wp_manager    import wp_manager as _wpm_startup
+
+    # Restore saved sites from DB
+    _restored = restore_sites_to_manager(_wpm_startup)
+    if _restored:
+        logger.info(f"Restored {_restored} WordPress sites from database")
+
+    # Start health monitoring
+    health_monitor.start(_wpm_startup, interval=60)
+
+    # Wire health events to dashboard
+    def _on_health_event(event):
+        append_dashboard_log(
+            f"[HEALTH] {event['type']} — {event['source']}",
+            "warn" if "down" in event["type"] else "info"
+        )
+    health_monitor.on_event(_on_health_event)
+
+    # Add /health route
+    @app.route("/health", methods=["GET"])
+    def agent_health():
+        return jsonify({
+            "status":  "ok",
+            "monitor": health_monitor.get_summary(),
+            "system":  system_awareness.get_snapshot(),
+        })
+
+    @app.route("/health/events", methods=["GET"])
+    def health_events_direct():
+        return jsonify({
+            "events": health_monitor.get_recent_events(
+                int(request.args.get("limit", 50))
+            )
+        })
+
+    # Patch /wp/register-site to also persist
+    _orig_register = None  # wp_routes handles this already
+
+    logger.info("Health Monitor + Sites Store active")
+
+except Exception as _hm_err:
+    logger.warning(f"Health Monitor optional: {_hm_err}")
+
 if __name__ == "__main__":
-    logger.info("REST Server on :5001")
+    local_base = f"http://127.0.0.1:{REST_PORT}"
+    logger.info(f"REST Server on {REST_HOST}:{REST_PORT}")
     logger.info(f"Screenshots: {PUBLIC_URL_BASE}/screenshots/")
     logger.info("Keep-alive: 30s interval")
-    logger.info("Dashboard: https://api.devmostafa.com/dashboard")
-    logger.info("Live Stream: https://api.devmostafa.com/stream")
+    logger.info(f"Dashboard (local): {local_base}/dashboard")
+    logger.info(f"Live Stream (local): {local_base}/stream")
+    if PUBLIC_URL_BASE != local_base:
+        logger.info(f"Dashboard (public): {PUBLIC_URL_BASE}/dashboard")
+        logger.info(f"Live Stream (public): {PUBLIC_URL_BASE}/stream")
 
     # Initialize SocketIO
     init_socketio()
     register_socketio_handlers()
 
     # Run with SocketIO
-    socketio.run(app, host="0.0.0.0", port=5001)
+    socketio.run(app, host=REST_HOST, port=REST_PORT)
