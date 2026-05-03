@@ -1,4 +1,4 @@
-# 🤖 AI WordPress Control Center v2.0
+#  AI local agent  Control Center v2.4
 ### EN MOSTAFA AI AGENT
 
 نظام متكامل لإدارة مواقع WordPress باستخدام الذكاء الاصطناعي.
@@ -149,7 +149,7 @@ POST /wp-json/ai-agent/v1/register-site
 
 ---
 
-## 🤖 LLM Configuration
+##  LLM Configuration
 
 ```bash
 # Claude (Anthropic)
@@ -214,7 +214,7 @@ POST /wp/knowledge/search
 
 ---
 
-## 🎯 Examples
+##  Examples
 
 ```bash
 # Run task via AI
@@ -244,7 +244,9 @@ GET /system/status
 - Python 3.11+
 - Flask + Flask-SocketIO
 - Playwright (for browser control)
-- WordPress 5.8+ (for Plugin)
+- WordPress 5.8+ (for Plugin) option
+- visual staudio (optional )
+- asp . net (optional )
 - Chrome (for Extension)
 
 ---
