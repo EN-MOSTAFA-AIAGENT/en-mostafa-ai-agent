@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible defect in the supported public-preview core.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include tokens, private paths, cookies, screenshots with personal data, or production credentials.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: v2.0.0-public-preview
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Include the expected and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Privileged area
+      options:
+        - None / read-only
+        - Filesystem write
+        - Shell execution
+        - Browser session
+        - Network exposure
+        - Unsure
+    validations:
+      required: true

@@ -62,3 +62,29 @@ server.py.bak
 
 # Directories to ignore
 smoke_folder/
+
+# EN MOSTAFA AI AGENT v3 public-release rules
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.env
+*.log
+*.db
+*.sqlite*
+data/
+screenshots/
+src/screenshots/
+Agent_Backups/
+product_images/
+reference_images/
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
