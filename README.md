@@ -1,254 +1,138 @@
-#  AI local agent  Control Center v2.4
-### EN MOSTAFA AI AGENT
+# EN MOSTAFA AI AGENT
 
-نظام متكامل لإدارة مواقع WordPress باستخدام الذكاء الاصطناعي.
+> A Windows-first, Arabic-aware local agent runtime that connects MCP clients to browser automation, files, system tools, short-term memory, and a live operator dashboard.
 
----
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![MCP](https://img.shields.io/badge/Protocol-MCP-6B46C1)](https://modelcontextprotocol.io/)
+[![Playwright](https://img.shields.io/badge/Browser-Playwright-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/python/)
+[![CI](https://github.com/EN-MOSTAFA-AIAGENT/en-mostafa-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/EN-MOSTAFA-AIAGENT/en-mostafa-ai-agent/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Public Preview](https://img.shields.io/badge/status-public%20preview-orange)](docs/DEVELOPMENT_STATUS.md)
 
-#التشغيل السريع
+**[الوثائق العربية](README.ar.md)**
 
-```bash
-# 1. Setup (مرة واحدة فقط)
-py -3.11 setup.py
+## Why this project exists
 
-# 2. Start Server
-py -3.11 server.py
-# OR
-start.bat
+Most desktop agent projects assume a Unix environment, English-only commands, or a hosted execution backend. EN MOSTAFA AI AGENT explores a different path: a transparent local runtime for Windows developers and operators, with Arabic and English commands, explicit safe and power tool planes, observable browser sessions, and provider-neutral MCP connectivity.
 
-# 3. Open Dashboard
-http://localhost:5001/wp-dashboard
+The project is designed for people who need an AI assistant to do verifiable work on a real machine—not only generate instructions—while keeping the operator in control of the execution boundary.
+
+## What it provides
+
+- A FastMCP gateway for Claude-compatible and other MCP clients.
+- A local Flask REST bridge for filesystem and system operations.
+- Playwright browser automation: navigation, extraction, interaction, screenshots, rendering, and lightweight UX analysis.
+- An Arabic RTL dashboard with live status, logs, screenshots, and commands.
+- Short-term TTL memory and bounded interaction history.
+- Thread-safe jobs with pause, resume, cancel, and waiting-for-user states.
+- Arabic and English natural-language commands for common browser actions.
+- Windows-first setup scripts pinned to Python 3.11.
+- Safe public defaults: loopback binding and read-only mode.
+
+```mermaid
+flowchart TD
+    A["Claude / Codex / MCP client"] --> B["FastMCP gateway :8000"]
+    B --> C["REST bridge :5001"]
+    B --> D["Playwright browser pool"]
+    B --> E["Short-term memory"]
+    C --> F["Windows files and shell"]
+    C --> G["Shared browser session"]
+    C --> H["Live RTL dashboard"]
 ```
 
----
+## Quick start on Windows
 
-##المعمارية
+Requirements: Windows 10/11, Python 3.11, and Git.
 
-```
-┌─────────────────────────────────────────────────────┐
-│                  Agent Server :5001                  │
-│                                                      │
-│  ┌──────────────┐    ┌──────────────────────────┐   │
-│  │  AgentCore   │◄──►│   Integration Layer      │   │
-│  │              │    │  (Unified Tool Interface) │   │
-│  └──────┬───────┘    └──────────────────────────┘   │
-│         │                                            │
-│  ┌──────▼────────────────────────────────────────┐  │
-│  │           Multi-Agent Orchestrator             │  │
-│  │  🎨 Creative  ⚙️ Technical  🎓 Educator        │  │
-│  └──────┬────────────────────────────────────────┘  │
-│         │                                            │
-│  ┌──────▼──────┐ ┌──────────┐ ┌───────────────────┐ │
-│  │ WPManager   │ │ LLMBridge│ │ KnowledgeManager  │ │
-│  │ (Multi-Site)│ │Claude/GPT│ │ PDF/TXT/URL/Plugin│ │
-│  └──────┬──────┘ └──────────┘ └───────────────────┘ │
-│         │                                            │
-│  ┌──────▼──────┐ ┌──────────┐ ┌───────────────────┐ │
-│  │SystemAwarns │ │FeedbackLp│ │ ToolRegistry      │ │
-│  │ Heartbeat   │ │ Learning │ │ 7 tools unified   │ │
-│  └─────────────┘ └──────────┘ └───────────────────┘ │
-└─────────────────────────────────────────────────────┘
-         ▲                    ▲
-         │                    │
-┌────────┴────────┐  ┌────────┴────────┐
-│ WordPress Plugin│  │Chrome Extension │
-│  REST API v1    │  │ Fallback DOM    │
-│  Heartbeat 60s  │  │ Context Menu    │
-│  Self-Heal      │  │ Popup UI        │
-└─────────────────┘  └─────────────────┘
+```powershell
+git clone https://github.com/EN-MOSTAFA-AIAGENT/en-mostafa-ai-agent.git
+cd en-mostafa-ai-agent
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+py -3.11 -m pip install --upgrade pip
+py -3.11 -m pip install -r requirements.txt
+py -3.11 -m playwright install chromium
 ```
 
----
+Start the REST bridge and MCP gateway in separate terminals:
 
-## ملفات المشروع
-
-### Python Agent
-| الملف | الوظيفة |
-|---|---|
-| `server.py` | Flask REST Server — نقطة الدخول الرئيسية |
-| `agent_core.py` | المركز الرئيسي + Integration Layer |
-| `multi_agent.py` | Creative / Technical / Educator agents |
-| `wp_manager.py` | Multi-site WordPress Python Client |
-| `wp_routes.py` | كل WordPress API routes (Blueprint) |
-| `knowledge_manager.py` | تعلم من PDF/TXT/URL/Plugin كامل |
-| `llm_bridge.py` | Claude / OpenAI / Ollama interface |
-| `tool_registry.py` | Unified Tool Interface |
-| `system_awareness.py` | وعي كامل بحالة النظام |
-| `feedback_loop.py` | تحسين مستمر بعد كل تنفيذ |
-
-### WordPress Plugin (`wordpress-plugin/ai-wordpress-agent/`)
-| الملف | الوظيفة |
-|---|---|
-| `ai-wordpress-agent.php` | Main plugin — Auto-registers with Agent |
-| `includes/class-aiwa-api.php` | 14 REST endpoints |
-| `includes/class-aiwa-heartbeat.php` | Heartbeat كل دقيقة |
-| `includes/class-aiwa-selfheal.php` | Self-Healing Firewall |
-| `admin/class-aiwa-dashboard.php` | WordPress Admin Panel |
-
-### Chrome Extension (`chrome-extension/`)
-| الملف | الوظيفة |
-|---|---|
-| `manifest.json` | Manifest v3 |
-| `background.js` | Service Worker — Agent Bridge |
-| `content.js` | DOM Analysis + Commands |
-| `popup.html` | Extension UI |
-
----
-
-## 🌐 API Endpoints
-
-### Agent Server
-```
-GET  /                    Health check
-GET  /system/status       Full system snapshot
-POST /run                 Execute any task (Local + Remote)
-GET  /wp-dashboard        WordPress-like Dashboard HTML
-
-POST /wp/register-site    Register WordPress site with Agent
-POST /wp/site-info        Get site information
-GET  /wp/sites-status     All sites connection status
-POST /wp/plugins          List plugins
-POST /wp/update-plugins   Update all plugins
-POST /wp/toggle-plugin    Activate / Deactivate plugin
-POST /wp/elementor-get    Read Elementor JSON
-POST /wp/elementor-set    Update Elementor JSON
-POST /wp/courses          List LearnDash courses
-POST /wp/create-course    Create LearnDash course
-POST /wp/analyze          AI site analysis
-POST /wp/auto-heal        Self-healing execution
-POST /wp/agents/run       Multi-agent task execution
-GET  /wp/agents/status    All agents status
-POST /wp/agents/route     Route task to correct agent
-
-POST /knowledge/upload    Upload file to knowledge base
-POST /wp/knowledge/search Search knowledge base
-POST /wp/knowledge/learn-url Learn from URL
-
-GET  /llm/configure       Get LLM config
-POST /llm/configure       Set LLM provider + key
+```powershell
+.\scripts\run_rest.ps1
+.\scripts\run_mcp.ps1
 ```
 
-### WordPress Plugin
-```
-GET  /wp-json/ai-agent/v1/ping
-GET  /wp-json/ai-agent/v1/site-info
-GET  /wp-json/ai-agent/v1/plugins
-POST /wp-json/ai-agent/v1/update-plugins
-POST /wp-json/ai-agent/v1/toggle-plugin
-GET  /wp-json/ai-agent/v1/users
-POST /wp-json/ai-agent/v1/manage-users
-POST /wp-json/ai-agent/v1/elementor-data
-GET  /wp-json/ai-agent/v1/elementor-data
-GET  /wp-json/ai-agent/v1/learndash-courses
-POST /wp-json/ai-agent/v1/learndash-courses
-POST /wp-json/ai-agent/v1/run-cli
-GET  /wp-json/ai-agent/v1/error-log
-POST /wp-json/ai-agent/v1/heartbeat
-POST /wp-json/ai-agent/v1/register-site
-```
+Then open:
 
----
+- Health check: `http://127.0.0.1:5001/healthz`
+- Operator dashboard: `http://127.0.0.1:5001/dashboard`
+- MCP SSE endpoint: `http://127.0.0.1:8000/sse`
 
-##  LLM Configuration
+Example MCP client configuration:
 
-```bash
-# Claude (Anthropic)
-POST /llm/configure
-{"provider":"claude","api_key":"sk-ant-...","model":"claude-sonnet-4-5"}
-
-# OpenAI
-POST /llm/configure
-{"provider":"openai","api_key":"sk-...","model":"gpt-4o-mini"}
-
-# Ollama (Local - Free)
-POST /llm/configure
-{"provider":"ollama","model":"llama3","base_url":"http://localhost:11434"}
-
-# Mock (Testing - no key needed)
-POST /llm/configure
-{"provider":"mock"}
+```json
+{
+  "mcpServers": {
+    "en-mostafa-agent": {
+      "url": "http://127.0.0.1:8000/sse"
+    }
+  }
+}
 ```
 
----
+See the full [Windows installation guide](docs/INSTALLATION.md) and [capability reference](docs/CAPABILITIES.md).
 
-## 🔧 WordPress Plugin Setup
+## Safety model
 
-1. Copy `wordpress-plugin/ai-wordpress-agent/` to `/wp-content/plugins/`
-2. Activate plugin in WordPress Admin
-3. Go to **AI Agent → Settings**
-4. Set **Agent URL**: `http://YOUR_SERVER:5001`
-5. Copy **API Key** from plugin settings
-6. Plugin auto-registers with Agent on save
+This release starts with:
 
----
-
-## 🧩 Chrome Extension Setup
-
-1. Open Chrome → `chrome://extensions/`
-2. Enable **Developer Mode**
-3. Click **Load unpacked**
-4. Select `C:\mcp-agent\chrome-extension\`
-5. Click extension icon → Configure Agent URL
-
----
-
-## 📚 Knowledge Base
-
-```python
-# Learn from file
-POST /knowledge/upload
-# (multipart form: file + tags)
-
-# Learn from URL
-POST /wp/knowledge/learn-url
-{"url": "https://docs.learndash.com/..."}
-
-# Learn from WordPress Plugin
-POST /wp/knowledge/learn-plugin
-{"path": "C:/wamp/www/wp-content/plugins/my-plugin"}
-
-# Search
-POST /wp/knowledge/search
-{"query": "how to create LearnDash course"}
+```dotenv
+REST_HOST=127.0.0.1
+MCP_HOST=127.0.0.1
+READONLY_MODE=true
 ```
 
----
+Power tools can modify files and execute shell commands with the permissions of the running user. Do not expose ports 5001 or 8000 directly to a LAN or the internet. Read [SECURITY.md](SECURITY.md) before enabling write or execution capabilities.
 
-##  Examples
+## Real-world validation
 
-```bash
-# Run task via AI
-POST /run
-{"task": "create learndash course called Python Basics", "site": "my-site"}
+The runtime grew from practical automation work rather than a synthetic agent demo. Maintainer-run field tests have included:
 
-# Multi-site plugin update
-POST /run
-{"task": "update all plugins", "all_sites": true}
+- Website inspection on `askmbt.com`: DOM extraction, full-page capture, an accessibility-oriented UX check, and a generated local report.
+- WordPress operations in a live site workflow, combining browser inspection with safe local execution.
+- Windows maintenance workflows on a Dell Latitude system: dependency checks, update orchestration, driver verification, and restore-point-aware execution.
 
-# Design with Elementor
-POST /wp/agents/run
-{"task": "design hero section with blue background", "site": "my-site"}
+These are maintainer-reported validations, not ecosystem adoption metrics. Reproducible scenarios and current limitations are documented in [Project impact](docs/PROJECT_IMPACT.md) and [Development status](docs/DEVELOPMENT_STATUS.md).
 
-# Self-heal
-POST /wp/auto-heal
-{"site": "my-site"}
+## Repository map
 
-# System status
-GET /system/status
+```text
+src/                 Runnable MCP, REST, browser, memory and job core
+experimental/        Supplied research modules awaiting missing internal adapters
+wordpress-plugin/    Existing WordPress REST, heartbeat and self-healing adapter
+chrome-extension/    Existing browser bridge and contextual automation extension
+templates/           Existing operator dashboard templates
+root Python modules  Established 2.x runtime and integration modules
+docs/                Architecture, capabilities, impact, security and roadmap
+scripts/             Windows setup and launch commands
+tests/               Independent core and service smoke tests
+.github/              CI and community contribution templates
 ```
 
----
+## Maturity and scope
 
-## 📊 System Requirements
+This is a **public preview**, not a production security boundary. The runnable core is included and tested. The planning, strategy, self-monitoring, and autonomous-loop research modules are clearly isolated under `experimental/` because several internal adapters were not present in the supplied public snapshot. No adoption, contributor, download, or dependency numbers are claimed.
 
-- Python 3.11+
-- Flask + Flask-SocketIO
-- Playwright (for browser control)
-- WordPress 5.8+ (for Plugin) option
-- visual staudio (optional )
-- asp . net (optional )
-- Chrome (for Extension)
+Read [Development status](docs/DEVELOPMENT_STATUS.md), [Architecture](docs/ARCHITECTURE.md), and the [Roadmap](docs/ROADMAP.md).
 
----
+## Contributing
 
-*Built with EN MOSTAFA AI AGENT — AI WordPress Control Center v2.0*
+External contributors are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), open a focused issue, and review the privilege implications of any filesystem, shell, dependency-installation, or browser change. Security issues should be reported privately according to [SECURITY.md](SECURITY.md).
+
+## Maintainer
+
+**Mostafa Selim Farag** — Senior Web Application Developer
+[devmostafa.com](https://www.devmostafa.com)
+
+## License
+
+Copyright 2026 Mostafa Selim Farag. Licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution information.
