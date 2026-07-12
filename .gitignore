@@ -22,6 +22,7 @@ __pycache__/
 *.log
 logs/
 *.txt
+!requirements.txt
 _tail.txt
 _test.txt
 ssh_out.txt
