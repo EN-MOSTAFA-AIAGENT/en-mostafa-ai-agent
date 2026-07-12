@@ -53,5 +53,5 @@ class StrategyEngine:
 
     def generate_new_strategy(self, command, error):
         if "pip" in command:
-            return "py -3.11 -m pip install"
+            return "py -3.14 -m pip install"
         return command

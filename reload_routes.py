@@ -1,7 +1,7 @@
 """
 reload_routes.py — Re-registers all wp_routes Blueprint routes
 Called when server needs route refresh without full restart
-Run: py -3.11 reload_routes.py  OR  POST /admin/reload
+Run: py -3.14 reload_routes.py  OR  POST /admin/reload
 """
 import sys, os, urllib.request, json
 

@@ -1,6 +1,6 @@
 """
 Live API Test — tests all endpoints against the running server
-Run: py -3.11 live_test.py
+Run: py -3.14 live_test.py
 """
 import urllib.request, json, sys, time
 sys.path.insert(0, r'C:\mcp-agent')

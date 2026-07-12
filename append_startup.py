@@ -1,6 +1,6 @@
 """
 Append health_monitor + sites_store startup to server.py
-Run: py -3.11 append_startup.py
+Run: py -3.14 append_startup.py
 """
 import os
 

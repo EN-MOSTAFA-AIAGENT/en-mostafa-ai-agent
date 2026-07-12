@@ -97,7 +97,7 @@ class SystemExecutor:
 
         if tool == "pip":
             cleaned = command.replace("pip", "").strip()
-            final_command = f"py -3.11 -m pip {cleaned}"
+            final_command = f"py -3.14 -m pip {cleaned}"
 
         retries = 2
 

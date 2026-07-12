@@ -2,7 +2,7 @@
 
 > A Windows-first, Arabic-aware local agent runtime that connects MCP clients to browser automation, files, system tools, short-term memory, and a live operator dashboard.
 
-[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.14](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/Protocol-MCP-6B46C1)](https://modelcontextprotocol.io/)
 [![Playwright](https://img.shields.io/badge/Browser-Playwright-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/python/)
 [![CI](https://github.com/EN-MOSTAFA-AIAGENT/en-mostafa-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/EN-MOSTAFA-AIAGENT/en-mostafa-ai-agent/actions/workflows/ci.yml)
@@ -26,7 +26,7 @@ The project is designed for people who need an AI assistant to do verifiable wor
 - Short-term TTL memory and bounded interaction history.
 - Thread-safe jobs with pause, resume, cancel, and waiting-for-user states.
 - Arabic and English natural-language commands for common browser actions.
-- Windows-first setup scripts pinned to Python 3.11.
+- Windows-first setup scripts pinned to Python 3.14.
 - Safe public defaults: loopback binding and read-only mode.
 
 ```mermaid
@@ -42,16 +42,16 @@ flowchart TD
 
 ## Quick start on Windows
 
-Requirements: Windows 10/11, Python 3.11, and Git.
+Requirements: Windows 10/11, Python 3.14, and Git.
 
 ```powershell
 git clone https://github.com/EN-MOSTAFA-AIAGENT/en-mostafa-ai-agent.git
 cd en-mostafa-ai-agent
-py -3.11 -m venv .venv
+py -3.14 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-py -3.11 -m pip install --upgrade pip
-py -3.11 -m pip install -r requirements.txt
-py -3.11 -m playwright install chromium
+py -3.14 -m pip install --upgrade pip
+py -3.14 -m pip install -r requirements.txt
+py -3.14 -m playwright install chromium
 ```
 
 Start the REST bridge and MCP gateway in separate terminals:

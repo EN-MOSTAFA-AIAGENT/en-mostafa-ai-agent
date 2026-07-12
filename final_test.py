@@ -1,4 +1,4 @@
-"""Final comprehensive test — run with py -3.11 final_test.py"""
+"""Final comprehensive test — run with py -3.14 final_test.py"""
 import sys, os
 sys.path.insert(0, r'C:\mcp-agent')
 os.chdir(r'C:\mcp-agent')

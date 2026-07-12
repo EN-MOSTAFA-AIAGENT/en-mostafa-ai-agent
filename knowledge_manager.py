@@ -289,7 +289,7 @@ class KnowledgeManager:
         try:
             import subprocess
             result = subprocess.run(
-                ["py", "-3.11", "-m", "pdfminer.high_level", path],
+                ["py", "-3.14", "-m", "pdfminer.high_level", path],
                 capture_output=True, text=True, timeout=30
             )
             if result.returncode == 0 and result.stdout:

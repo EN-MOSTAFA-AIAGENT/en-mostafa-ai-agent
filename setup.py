@@ -1,7 +1,7 @@
 """
 Setup Script — AI WordPress Control Center
 يثبت كل المتطلبات ويجهز قاعدة البيانات
-Run: py -3.11 setup.py
+Run: py -3.14 setup.py
 """
 import subprocess, sys, os
 
@@ -24,13 +24,13 @@ def step(msg):
 
 step("1/5 Installing Python dependencies")
 for dep in DEPS:
-    ok, out = run(f"py -3.11 -m pip install {dep} --quiet --break-system-packages")
+    ok, out = run(f"py -3.14 -m pip install {dep} --quiet --break-system-packages")
     if not ok:
-        ok, out = run(f"py -3.11 -m pip install {dep} --quiet")
+        ok, out = run(f"py -3.14 -m pip install {dep} --quiet")
     print(f"  {'OK' if ok else 'WARN'} {dep}")
 
 step("2/5 Installing Playwright browsers")
-ok, out = run("py -3.11 -m playwright install chromium")
+ok, out = run("py -3.14 -m playwright install chromium")
 print(f"  {'OK' if ok else 'WARN'} Playwright chromium")
 
 step("3/5 Initializing databases")
@@ -93,7 +93,7 @@ print()
 print("="*50)
 print("  SETUP COMPLETE")
 print()
-print("  To start: py -3.11 server.py")
+print("  To start: py -3.14 server.py")
 print("  Or:       start.bat")
 print()
 print("  Dashboard: http://localhost:5001/wp-dashboard")

@@ -10,7 +10,7 @@
 | MCP tool gateway | Included | File, memory, browser, screenshot and UX tools |
 | Playwright automation | Included | Requires Chromium installation for integration tests |
 | RTL dashboard | Included | Served directly from the REST bridge |
-| CI | Included | Python 3.11 dependency install, compile, tests |
+| CI | Included | Python 3.14 dependency install, compile, tests |
 
 ## Experimental—not advertised as complete
 

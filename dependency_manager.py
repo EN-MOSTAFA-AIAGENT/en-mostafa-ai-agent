@@ -29,7 +29,7 @@ class DependencyManager:
         """
         try:
             if dep_type == "python":
-                result = self._run(f"py -3.11 -m pip show {name}")
+                result = self._run(f"py -3.14 -m pip show {name}")
 
                 if result.returncode == 0:
                     version = ""
@@ -64,7 +64,7 @@ class DependencyManager:
 
         try:
             if dep_type == "python":
-                cmd = f"py -3.11 -m pip install {name}"
+                cmd = f"py -3.14 -m pip install {name}"
 
             elif name.lower() == "git":
                 cmd = "winget install Git.Git"

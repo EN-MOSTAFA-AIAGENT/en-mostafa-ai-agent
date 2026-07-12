@@ -1,6 +1,6 @@
 """
 Append: Smart Connection + User Management + AI Operator routes
-Run: py -3.11 patch_routes.py
+Run: py -3.14 patch_routes.py
 """
 import os
 

@@ -135,7 +135,7 @@ POST http://AGENT:5001/wp/error-report       تقرير إصلاح ذاتي
 ```
 السبب: Agent URL غلط
 الحل:
-  1. تأكد server.py شغال: py -3.11 server.py
+  1. تأكد server.py شغال: py -3.14 server.py
   2. افتح http://YOUR-IP:5001/healthz في browser
   3. لو شغال ← عدّل Agent URL في Plugin Settings
   4. لو على server خارجي: افتح Port 5001 في Firewall

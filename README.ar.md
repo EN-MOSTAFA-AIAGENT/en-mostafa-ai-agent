@@ -2,7 +2,7 @@
 
 > وكيل أتمتة محلي يربط ChatGPT وCodex وأي عميل MCP بنظام Windows، مع تشغيل أوامر النظام وإدارة الملفات والتحكم في المتصفح ولوحة متابعة مباشرة.
 
-[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python 3.14](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/Protocol-MCP-6B46C1)](https://modelcontextprotocol.io/)
 [![Playwright](https://img.shields.io/badge/Browser-Playwright-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/python/)
 [![Public Preview](https://img.shields.io/badge/Release-Public%20Preview-orange)](#حالة-الإصدار)
@@ -41,16 +41,16 @@ flowchart TD
 
 ## التثبيت السريع على Windows
 
-المتطلبات: Windows 10/11، Python 3.11، وGit.
+المتطلبات: Windows 10/11، Python 3.14، وGit.
 
 ```powershell
 git clone https://github.com/EN-MOSTAFA-AIAGENT/en-mostafa-ai-agent.git
 cd en-mostafa-ai-agent
-py -3.11 -m venv .venv
+py -3.14 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-py -3.11 -m pip install --upgrade pip
-py -3.11 -m pip install -r requirements.txt
-py -3.11 -m playwright install chromium
+py -3.14 -m pip install --upgrade pip
+py -3.14 -m pip install -r requirements.txt
+py -3.14 -m playwright install chromium
 Copy-Item .env.example .env
 ```
 

@@ -22,7 +22,7 @@ set "PUBLIC_BASE=https://api.devmostafa.com"
 set "LOCAL_REST_BASE=http://127.0.0.1:%REST_PORT%"
 set "DASHBOARD_URL=%LOCAL_REST_BASE%/wp-dashboard"
 set "CLOUDFLARED_EXE=C:\cloudflared\cloudflared.exe"
-set "PYTHON_CMD=py -3.11"
+set "PYTHON_CMD=py -3.14"
 set "PYTHONIOENCODING=utf-8"
 set "PYTHONPATH=%ROOT%"
 

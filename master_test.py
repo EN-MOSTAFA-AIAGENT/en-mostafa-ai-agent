@@ -1,4 +1,4 @@
-"""Master Final Test — py -3.11 -W ignore master_test.py"""
+"""Master Final Test — py -3.14 -W ignore master_test.py"""
 import sys, os, time
 sys.path.insert(0, r'C:\mcp-agent')
 os.chdir(r'C:\mcp-agent')

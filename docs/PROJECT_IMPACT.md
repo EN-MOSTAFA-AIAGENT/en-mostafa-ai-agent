@@ -34,7 +34,7 @@ The runtime supported a Windows maintenance workflow on a Dell Latitude E6540, i
 - 5 modules in the supported runtime core.
 - 11 research modules preserved under `experimental/`.
 - 6 independent core unit tests passing in the prepared release.
-- CI compilation and test workflow for Python 3.11.
+- CI compilation and test workflow for Python 3.14.
 - No embedded API keys, passwords, or personal Windows paths in the public release.
 
 ## What is not claimed

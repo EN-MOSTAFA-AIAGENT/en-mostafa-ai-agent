@@ -739,7 +739,7 @@ socketio = None
 def init_socketio():
     global socketio
     from flask_socketio import SocketIO
-    # Use eventlet for async support to fix Python 3.11 compatibility
+    # Use eventlet for async support to fix Python 3.14 compatibility
     socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 def register_socketio_handlers():
     @socketio.on("connect", namespace="/dashboard")
